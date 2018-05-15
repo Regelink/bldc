@@ -503,7 +503,8 @@ typedef enum {
 	CAN_PACKET_SET_CURRENT_REL,
 	CAN_PACKET_SET_CURRENT_BRAKE_REL,
 	CAN_PACKET_SET_CURRENT_HANDBRAKE,
-	CAN_PACKET_SET_CURRENT_HANDBRAKE_REL
+	CAN_PACKET_SET_CURRENT_HANDBRAKE_REL,
+	CAN_PACKET_STATUS2
 } CAN_PACKET_ID;
 
 // Logged fault data
@@ -549,10 +550,19 @@ typedef struct {
 typedef struct {
 	int id;
 	systime_t rx_time;
-	float rpm;
-	float current;
+	float rpm;         /* electrical rpm */
+	float current;     /* motor current */
 	float duty;
 } can_status_msg;
+
+typedef struct {
+	int id;
+	systime_t rx_time;
+	float u_input;     /* input voltage */
+	float i_input;     /* input current */
+	float temp_fet;    /* FET temperature */
+	float temp_mot;    /* motor temperature */
+} can_status2_msg;
 
 typedef struct {
 	uint8_t js_x;
