@@ -357,7 +357,7 @@ static THD_FUNCTION(cancom_status_thread, arg) {
 			buffer_append_float16(buffer, mc_interface_temp_fet_filtered(), 1e2, &send_index);
 			buffer_append_float16(buffer, mc_interface_temp_motor_filtered(), 1e2, &send_index);
 			comm_can_transmit_eid(app_get_configuration()->controller_id |
-					((uint32_t)CAN_PACKET_STATUS << 8), buffer, send_index);
+					((uint32_t)CAN_PACKET_STATUS2 << 8), buffer, send_index);
 		}
 
 		systime_t sleep_time = CH_CFG_ST_FREQUENCY / app_get_configuration()->send_can_status_rate_hz;
