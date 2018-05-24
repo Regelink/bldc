@@ -73,13 +73,14 @@ typedef enum {
 
 typedef enum {
 	CONTROL_MODE_DUTY = 0,
-	CONTROL_MODE_SPEED,
+	CONTROL_MODE_SPEED_PID,
 	CONTROL_MODE_CURRENT,
 	CONTROL_MODE_CURRENT_BRAKE,
 	CONTROL_MODE_POS,
 	CONTROL_MODE_HANDBRAKE,
 	CONTROL_MODE_OPENLOOP,
-	CONTROL_MODE_NONE
+	CONTROL_MODE_NONE,
+	CONTROL_MODE_SPEED_LQR
 } mc_control_mode;
 
 typedef enum {
@@ -244,6 +245,25 @@ typedef struct {
 	float m_bldc_f_sw_max;
 	float m_dc_f_sw;
 	float m_ntc_motor_beta;
+	// Speed LQR
+	float s_lqr_A00;
+	float s_lqr_A01;
+	float s_lqr_A10;
+	float s_lqr_A11;
+	float s_lqr_B0;
+	float s_lqr_B1;
+	float s_lqr_C0;
+	float s_lqr_C1;
+	float s_lqr_K0;
+	float s_lqr_K1;
+	float s_lqr_L0;
+	float s_lqr_L1;
+	float s_lqr_Nbar;
+	uint32_t s_lqr_oversampling_factor;
+	float s_lqr_voltage_filter_freq;
+	float s_lqr_max_speed;
+	float s_lqr_max_voltage_drop;
+	float s_lqr_max_duty;
 } mc_configuration;
 
 // Applications to use

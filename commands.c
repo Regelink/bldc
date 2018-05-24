@@ -360,6 +360,25 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		mcconf.m_dc_f_sw = buffer_get_float32_auto(data, &ind);
 		mcconf.m_ntc_motor_beta = buffer_get_float32_auto(data, &ind);
 
+		mcconf.s_lqr_A00 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_A01 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_A10 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_A11 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_B0 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_B1 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_C0 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_C1 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_K0 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_K1 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_L0 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_L1 = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_Nbar = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_oversampling_factor = buffer_get_uint32(data, &ind);
+		mcconf.s_lqr_voltage_filter_freq = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_max_speed = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_max_voltage_drop = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_max_duty = buffer_get_float32_auto(data, &ind);
+
 		// Apply limits if they are defined
 #ifndef DISABLE_HW_LIMITS
 #ifdef HW_LIM_CURRENT
@@ -517,6 +536,25 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		buffer_append_float32_auto(send_buffer, mcconf.m_bldc_f_sw_max, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.m_dc_f_sw, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.m_ntc_motor_beta, &ind);
+
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_A00, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_A01, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_A10, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_A11, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_B0, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_B1, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_C0, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_C1, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_K0, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_K1, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_L0, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_L1, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_Nbar, &ind);
+		buffer_append_uint32(send_buffer, mcconf.s_lqr_oversampling_factor, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_voltage_filter_freq, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_speed, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_voltage_drop, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_duty, &ind);
 
 		commands_send_packet(send_buffer, ind);
 		break;

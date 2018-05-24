@@ -25,6 +25,7 @@
 #include "mc_interface.h"
 #include "ch.h"
 #include "hal.h"
+#include "hw.h"
 #include "stm32f4xx_conf.h"
 #include "digital_filter.h"
 #include "utils.h"
@@ -36,6 +37,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <float.h>
 
 // Private types
 typedef struct {
@@ -126,6 +128,7 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 		uint32_t* tAout, uint32_t* tBout, uint32_t* tCout, uint32_t *svm_sector);
 static void run_pid_control_pos(float angle_now, float angle_set, float dt);
 static void run_pid_control_speed(float dt);
+static void run_lqr_control_speed(float dt);
 static void stop_pwm_hw(void);
 static void start_pwm_hw(void);
 static int read_hall(void);
@@ -542,7 +545,7 @@ void mcpwm_foc_set_duty_noramp(float dutyCycle) {
  * The electrical RPM goal value to use.
  */
 void mcpwm_foc_set_pid_speed(float rpm) {
-	m_control_mode = CONTROL_MODE_SPEED;
+	m_control_mode = CONTROL_MODE_SPEED_PID;
 	m_speed_pid_set_rpm = rpm;
 
 	if (m_state != MC_STATE_RUNNING) {
@@ -1684,7 +1687,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		}
 
 		// Brake when set ERPM is below min ERPM
-		if (m_control_mode == CONTROL_MODE_SPEED &&
+		if (m_control_mode == CONTROL_MODE_SPEED_PID &&
 				fabsf(m_speed_pid_set_rpm) < m_conf->s_pid_min_erpm) {
 			control_duty = true;
 			duty_set = 0.0;
@@ -2037,6 +2040,7 @@ static THD_FUNCTION(timer_thread, arg) {
 				m_conf->foc_observer_gain * m_conf->foc_observer_gain_slow, m_conf->foc_observer_gain);
 
 		run_pid_control_speed(dt);
+		run_lqr_control_speed(dt);
 		chThdSleepMilliseconds(1);
 	}
 
@@ -2469,7 +2473,7 @@ static void run_pid_control_speed(float dt) {
 	float d_term;
 
 	// PID is off. Return.
-	if (m_control_mode != CONTROL_MODE_SPEED) {
+	if (m_control_mode != CONTROL_MODE_SPEED_PID) {
 		i_term = 0.0;
 		prev_error = 0.0;
 		return;
@@ -2517,6 +2521,59 @@ static void run_pid_control_speed(float dt) {
 	}
 
 	m_iq_set = output * m_conf->lo_current_max;
+}
+
+static void run_lqr_control_speed(float dt)
+{
+	static float u_filtered = FLT_MIN;
+	static float duty_set = 0.0;
+	static float state[2] = { };
+	static float last_int_in[2] = { };
+
+	/* Return if control mode is not LQR speed */
+	if (m_control_mode != CONTROL_MODE_SPEED_LQR) {
+		return;
+	}
+
+	/* Acquire input voltage and filter it (filter is initialized with first sample) */
+	const float u_input = GET_INPUT_VOLTAGE();
+	if (u_filtered == FLT_MIN) u_filtered = u_input;
+	ema_filter(u_input, &u_filtered, m_conf->s_lqr_voltage_filter_freq, dt);
+
+	/* Calculate set_voltage contributions */
+	const float set_u1 = m_conf->s_lqr_Nbar * fabsf(m_speed_pid_set_rpm) * 2.0 * M_PI / 60.0;
+	const float set_u2 = m_conf->s_lqr_max_voltage_drop
+	                     * (m_speed_pid_set_rpm / m_conf->s_lqr_max_speed)
+	                     * (m_speed_pid_set_rpm / m_conf->s_lqr_max_speed);
+
+	const float act_speed = mcpwm_foc_get_rpm() * 2.0 * M_PI / 60.0;
+
+	for (int i = 0; i < m_conf->s_lqr_oversampling_factor; i++) {
+		/* calculate u_set from u_filtered and the last duty cycle */
+		const float u_set = u_filtered * duty_set;
+		const float est_speed = m_conf->s_lqr_C0 * state[0] + m_conf->s_lqr_C1 * state[1];
+
+		/* estimator:
+		 *    input:  u_set and act_speed;
+		 *    output: state vector (speed, current)
+		 *
+		 * Calculate input of integrator:
+		 */
+		const float int_in[] = {
+			m_conf->s_lqr_B0 * u_set + m_conf->s_lqr_A00 * state[0] + m_conf->s_lqr_A01 * state[1] + m_conf->s_lqr_L0 * (act_speed - est_speed),
+			m_conf->s_lqr_B1 * u_set + m_conf->s_lqr_A10 * state[0] + m_conf->s_lqr_A11 * state[1] + m_conf->s_lqr_L1 * (act_speed - est_speed)
+		};
+		state[0] += (int_in[0] + last_int_in[0]) * dt / (2.0 * m_conf->s_lqr_oversampling_factor); // forward Euler integration
+		state[1] += (int_in[1] + last_int_in[1]) * dt / (2.0 * m_conf->s_lqr_oversampling_factor); // forward Euler integration
+		last_int_in[0] = int_in[0];
+		last_int_in[1] = int_in[1];
+
+		/* Calculate duty cycle */
+		const float set_u3 = m_conf->s_lqr_K0 * state[0] + m_conf->s_lqr_K1 * state[1];
+		duty_set = (set_u1 + set_u2 - set_u3) / u_filtered;
+	}
+	utils_truncate_number(&duty_set, 0.0,  m_conf->s_lqr_max_duty);
+	m_iq_set = duty_set * m_conf->lo_current_max;
 }
 
 static void stop_pwm_hw(void) {

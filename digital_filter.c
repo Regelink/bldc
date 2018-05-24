@@ -232,3 +232,20 @@ void filter_add_sample(float *buffer, float sample, int bits, uint32_t *offset) 
 	*offset += 1;
 	*offset &= cnt_mask;
 }
+
+/* An exponential moving average (EMA), also known as an exponentially weighted moving average (EWMA),
+ * is a type of infinite impulse response filter that applies weighting factors which decrease exponentially.
+ * The weighting for each older datum decreases exponentially, never reaching zero.
+ * - cut_off_freq in Hz
+ * - sampling time (h) in seconds
+ * If the cut off frequency is zero or less, then bypass the filter
+ */
+void ema_filter(float sample, float *filtered_value, float cut_off_freq, float h)
+{
+	if (cut_off_freq > 0.0) {
+		float alpha = h / (h + 1 / (2 * M_PI * cut_off_freq));
+		*filtered_value = alpha * sample + (1.0 - alpha) * (*filtered_value);
+	} else {
+		*filtered_value = sample;
+	}
+}

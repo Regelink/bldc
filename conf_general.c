@@ -271,6 +271,25 @@ void conf_general_get_default_mc_configuration(mc_configuration *conf) {
 	conf->p_pid_kd_filter = MCCONF_P_PID_KD_FILTER;
 	conf->p_pid_ang_div = MCCONF_P_PID_ANG_DIV;
 
+	conf->s_lqr_A00 = MCONF_S_LQR_A00;
+	conf->s_lqr_A01 = MCONF_S_LQR_A01;
+	conf->s_lqr_A10 = MCONF_S_LQR_A10;
+	conf->s_lqr_A11 = MCONF_S_LQR_A11;
+	conf->s_lqr_B0 = MCONF_S_LQR_B0;
+	conf->s_lqr_B1 = MCONF_S_LQR_B1;
+	conf->s_lqr_C0 = MCONF_S_LQR_C0;
+	conf->s_lqr_C1 = MCONF_S_LQR_C1;
+	conf->s_lqr_K0 = MCONF_S_LQR_K0;
+	conf->s_lqr_K1 = MCONF_S_LQR_K1;
+	conf->s_lqr_L0 = MCONF_S_LQR_L0;
+	conf->s_lqr_L1 = MCONF_S_LQR_L1;
+	conf->s_lqr_Nbar = MCONF_S_LQR_NBAR;
+	conf->s_lqr_oversampling_factor = MCONF_S_LQR_OVERSAMPLING_FACTOR;
+	conf->s_lqr_voltage_filter_freq = MCONF_S_LQR_VOLTAGE_FILTER_FREQ;
+	conf->s_lqr_max_speed = MCONF_S_LQR_MAX_SPEED;
+	conf->s_lqr_max_voltage_drop = MCONF_S_LQR_MAX_VOLTAGE_DROP;
+	conf->s_lqr_max_duty = MCONF_S_LQR_MAX_DUTY;
+
 	conf->cc_startup_boost_duty = MCCONF_CC_STARTUP_BOOST_DUTY;
 	conf->cc_min_current = MCCONF_CC_MIN_CURRENT;
 	conf->cc_gain = MCCONF_CC_GAIN;
