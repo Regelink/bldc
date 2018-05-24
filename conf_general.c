@@ -307,6 +307,7 @@ void conf_general_get_default_mc_configuration(mc_configuration *conf) {
 	conf->m_bldc_f_sw_max = MCCONF_M_BLDC_F_SW_MAX;
 	conf->m_dc_f_sw = MCCONF_M_DC_F_SW;
 	conf->m_ntc_motor_beta = MCCONF_M_NTC_MOTOR_BETA;
+	conf->motor_poles = MCCONF_M_MOTOR_POLES;
 }
 
 /**

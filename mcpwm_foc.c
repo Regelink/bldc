@@ -2546,9 +2546,9 @@ static void run_lqr_control_speed(float dt)
 	                     * (m_speed_pid_set_rpm / m_conf->s_lqr_max_speed)
 	                     * (m_speed_pid_set_rpm / m_conf->s_lqr_max_speed);
 
-	const float act_speed = mcpwm_foc_get_rpm() * 2.0 * M_PI / 60.0;
+	const float act_speed = mcpwm_foc_get_rpm() * 2.0 * M_PI / 60.0 * 2.0 / m_conf->motor_poles;
 
-	for (int i = 0; i < m_conf->s_lqr_oversampling_factor; i++) {
+	for (unsigned int i = 0; i < m_conf->s_lqr_oversampling_factor; i++) {
 		/* calculate u_set from u_filtered and the last duty cycle */
 		const float u_set = u_filtered * duty_set;
 		const float est_speed = m_conf->s_lqr_C0 * state[0] + m_conf->s_lqr_C1 * state[1];

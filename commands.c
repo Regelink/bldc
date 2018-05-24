@@ -359,6 +359,7 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		mcconf.m_bldc_f_sw_max = buffer_get_float32_auto(data, &ind);
 		mcconf.m_dc_f_sw = buffer_get_float32_auto(data, &ind);
 		mcconf.m_ntc_motor_beta = buffer_get_float32_auto(data, &ind);
+		mcconf.motor_poles = data[ind++];
 
 		mcconf.s_lqr_A00 = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_A01 = buffer_get_float32_auto(data, &ind);
@@ -536,6 +537,7 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		buffer_append_float32_auto(send_buffer, mcconf.m_bldc_f_sw_max, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.m_dc_f_sw, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.m_ntc_motor_beta, &ind);
+		send_buffer[ind++] = mcconf.motor_poles;
 
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_A00, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_A01, &ind);

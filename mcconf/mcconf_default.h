@@ -417,5 +417,8 @@
 #ifndef MCCONF_M_NTC_MOTOR_BETA
 #define MCCONF_M_NTC_MOTOR_BETA			3380.0 // Beta value for motor termistor
 #endif
+#ifndef MCCONF_M_MOTOR_POLES
+#define MCCONF_M_MOTOR_POLES            14 // Motor poles
+#endif
 
 #endif /* MCCONF_DEFAULT_H_ */

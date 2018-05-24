@@ -227,24 +227,6 @@ typedef struct {
 	float p_pid_kd;
 	float p_pid_kd_filter;
 	float p_pid_ang_div;
-	// Current controller
-	float cc_startup_boost_duty;
-	float cc_min_current;
-	float cc_gain;
-	float cc_ramp_step_max;
-	// Misc
-	int32_t m_fault_stop_time_ms;
-	float m_duty_ramp_step;
-	float m_current_backoff_gain;
-	uint32_t m_encoder_counts;
-	sensor_port_mode m_sensor_port_mode;
-	bool m_invert_direction;
-	drv8301_oc_mode m_drv8301_oc_mode;
-	int m_drv8301_oc_adj;
-	float m_bldc_f_sw_min;
-	float m_bldc_f_sw_max;
-	float m_dc_f_sw;
-	float m_ntc_motor_beta;
 	// Speed LQR
 	float s_lqr_A00;
 	float s_lqr_A01;
@@ -264,6 +246,25 @@ typedef struct {
 	float s_lqr_max_speed;
 	float s_lqr_max_voltage_drop;
 	float s_lqr_max_duty;
+	// Current controller
+	float cc_startup_boost_duty;
+	float cc_min_current;
+	float cc_gain;
+	float cc_ramp_step_max;
+	// Misc
+	int32_t m_fault_stop_time_ms;
+	float m_duty_ramp_step;
+	float m_current_backoff_gain;
+	uint32_t m_encoder_counts;
+	sensor_port_mode m_sensor_port_mode;
+	bool m_invert_direction;
+	drv8301_oc_mode m_drv8301_oc_mode;
+	int m_drv8301_oc_adj;
+	float m_bldc_f_sw_min;
+	float m_bldc_f_sw_max;
+	float m_dc_f_sw;
+	float m_ntc_motor_beta;
+	uint8_t motor_poles;
 } mc_configuration;
 
 // Applications to use
