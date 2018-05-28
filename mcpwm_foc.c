@@ -562,6 +562,22 @@ void mcpwm_foc_set_pid_speed(float rpm) {
 }
 
 /**
+ * Use LQR rpm control. Note that this value has to be multiplied by half of
+ * the number of motor poles.
+ *
+ * @param rpm
+ * The electrical RPM goal value to use.
+ */
+void mcpwm_foc_set_lqr_speed(float rpm) {
+	m_control_mode = CONTROL_MODE_SPEED_LQR;
+	m_speed_pid_set_rpm = rpm;
+
+	if (m_state != MC_STATE_RUNNING) {
+		m_state = MC_STATE_RUNNING;
+	}
+}
+
+/**
  * Use PID position control. Note that this only works when encoder support
  * is enabled.
  *

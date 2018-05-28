@@ -208,6 +208,12 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		timeout_reset();
 		break;
 
+	case COMM_SET_RPM_LQR:
+		ind = 0;
+		mc_interface_set_lqr_speed((float)buffer_get_int32(data, &ind));
+		timeout_reset();
+		break;
+
 	case COMM_SET_POS:
 		ind = 0;
 		mc_interface_set_pid_pos((float)buffer_get_int32(data, &ind) / 1000000.0);
