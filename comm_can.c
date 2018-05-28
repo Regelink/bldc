@@ -47,6 +47,7 @@ static THD_FUNCTION(cancom_process_thread, arg);
 
 // Variables
 static can_status_msg stat_msgs[CAN_STATUS_MSGS_TO_STORE];
+static can_status2_msg stat2_msgs[CAN_STATUS_MSGS_TO_STORE];
 static mutex_t can_mtx;
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
 static unsigned int rx_buffer_last_id;
@@ -76,6 +77,7 @@ static void(*sid_callback)(uint32_t id, uint8_t *data, uint8_t len) = 0;
 void comm_can_init(void) {
 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
 		stat_msgs[i].id = -1;
+		stat2_msgs[i].id = -1;
 	}
 
 	rx_frame_read = 0;
@@ -166,6 +168,7 @@ static THD_FUNCTION(cancom_process_thread, arg) {
 				uint8_t id = rxmsg.EID & 0xFF;
 				CAN_PACKET_ID cmd = rxmsg.EID >> 8;
 				can_status_msg *stat_tmp;
+				can_status2_msg *stat2_tmp;
 
 				if (id == 255 || id == app_get_configuration()->controller_id) {
 					switch (cmd) {
@@ -302,6 +305,22 @@ static THD_FUNCTION(cancom_process_thread, arg) {
 					}
 					break;
 
+				case CAN_PACKET_STATUS2:
+					for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+						stat2_tmp = &stat2_msgs[i];
+						if (stat2_tmp->id == id || stat2_tmp->id == -1) {
+							ind = 0;
+							stat2_tmp->id = id;
+							stat2_tmp->rx_time = chVTGetSystemTime();
+							stat2_tmp->u_input = buffer_get_float16(rxmsg.data8, 1e2, &ind);
+							stat2_tmp->i_input = buffer_get_float16(rxmsg.data8, 1e2, &ind);
+							stat2_tmp->temp_fet = buffer_get_float16(rxmsg.data8, 1e2, &ind);
+							stat2_tmp->temp_mot = buffer_get_float16(rxmsg.data8, 1e2, &ind);
+							break;
+						}
+					}
+					break;
+
 				default:
 					break;
 				}
@@ -332,6 +351,19 @@ static THD_FUNCTION(cancom_status_thread, arg) {
 			buffer_append_int16(buffer, (int16_t)(mc_interface_get_duty_cycle_now() * 1000.0), &send_index);
 			comm_can_transmit_eid(app_get_configuration()->controller_id |
 					((uint32_t)CAN_PACKET_STATUS << 8), buffer, send_index);
+		}
+
+		/* Send status2 message if enabled */
+		if (app_get_configuration()->send_can_status) {
+		//if (app_get_configuration()->send_can_status2) {
+			int32_t send_index = 0;
+			uint8_t buffer[8];
+			buffer_append_float16(buffer, GET_INPUT_VOLTAGE(), 1e2, &send_index);
+			buffer_append_float16(buffer, mc_interface_get_tot_current_in(), 1e2, &send_index);
+			buffer_append_float16(buffer, mc_interface_temp_fet_filtered(), 1e2, &send_index);
+			buffer_append_float16(buffer, mc_interface_temp_motor_filtered(), 1e2, &send_index);
+			comm_can_transmit_eid(app_get_configuration()->controller_id |
+					((uint32_t)CAN_PACKET_STATUS2 << 8), buffer, send_index);
 		}
 
 		systime_t sleep_time = CH_CFG_ST_FREQUENCY / app_get_configuration()->send_can_status_rate_hz;
@@ -629,6 +661,42 @@ can_status_msg *comm_can_get_status_msg_id(int id) {
 	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
 		if (stat_msgs[i].id == id) {
 			return &stat_msgs[i];
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Get status2 message by index.
+ *
+ * @param index
+ * Index in the array
+ *
+ * @return
+ * The message or 0 for an invalid index.
+ */
+can_status2_msg *comm_can_get_status2_msg_index(int index) {
+	if (index < CAN_STATUS_MSGS_TO_STORE) {
+		return &stat2_msgs[index];
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * Get status2 message by id.
+ *
+ * @param id
+ * Id of the controller that sent the status2 message.
+ *
+ * @return
+ * The message or 0 for an invalid id.
+ */
+can_status2_msg *comm_can_get_status2_msg_id(int id) {
+	for (int i = 0;i < CAN_STATUS_MSGS_TO_STORE;i++) {
+		if (stat2_msgs[i].id == id) {
+			return &stat2_msgs[i];
 		}
 	}
 

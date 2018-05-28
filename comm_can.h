@@ -43,5 +43,7 @@ void comm_can_set_current_rel(uint8_t controller_id, float current_rel);
 void comm_can_set_current_brake_rel(uint8_t controller_id, float current_rel);
 can_status_msg *comm_can_get_status_msg_index(int index);
 can_status_msg *comm_can_get_status_msg_id(int id);
+can_status2_msg *comm_can_get_status2_msg_index(int index);
+can_status2_msg *comm_can_get_status2_msg_id(int id);
 
 #endif /* COMM_CAN_H_ */
