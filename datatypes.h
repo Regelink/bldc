@@ -243,9 +243,13 @@ typedef struct {
 	float s_lqr_Nbar;
 	uint32_t s_lqr_oversampling_factor;
 	float s_lqr_voltage_filter_freq;
+	float s_lqr_min_speed;
 	float s_lqr_max_speed;
 	float s_lqr_max_voltage_drop;
+	float s_lqr_min_duty;
 	float s_lqr_max_duty;
+	float s_lqr_max_thrust;
+	float s_lqr_max_thrust_rate;
 	// Current controller
 	float cc_startup_boost_duty;
 	float cc_min_current;

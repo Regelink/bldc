@@ -286,9 +286,13 @@ void conf_general_get_default_mc_configuration(mc_configuration *conf) {
 	conf->s_lqr_Nbar = MCONF_S_LQR_NBAR;
 	conf->s_lqr_oversampling_factor = MCONF_S_LQR_OVERSAMPLING_FACTOR;
 	conf->s_lqr_voltage_filter_freq = MCONF_S_LQR_VOLTAGE_FILTER_FREQ;
+	conf->s_lqr_min_speed = MCONF_S_LQR_MIN_SPEED;
 	conf->s_lqr_max_speed = MCONF_S_LQR_MAX_SPEED;
 	conf->s_lqr_max_voltage_drop = MCONF_S_LQR_MAX_VOLTAGE_DROP;
+	conf->s_lqr_min_duty = MCONF_S_LQR_MIN_DUTY;
 	conf->s_lqr_max_duty = MCONF_S_LQR_MAX_DUTY;
+	conf->s_lqr_max_thrust = MCONF_S_LQR_MAX_THRUST;
+	conf->s_lqr_max_thrust_rate = MCONF_S_LQR_MAX_THRUST_RATE;
 
 	conf->cc_startup_boost_duty = MCCONF_CC_STARTUP_BOOST_DUTY;
 	conf->cc_min_current = MCCONF_CC_MIN_CURRENT;

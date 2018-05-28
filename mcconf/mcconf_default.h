@@ -191,14 +191,26 @@
 #ifndef MCONF_S_LQR_VOLTAGE_FILTER_FREQ
 #define MCONF_S_LQR_VOLTAGE_FILTER_FREQ 25.0 // Voltage filter frequency (Hz)
 #endif
+#ifndef MCONF_S_LQR_MIN_SPEED
+#define MCONF_S_LQR_MIN_SPEED           0.0 // Minimum Speed (mechanical rpm)
+#endif
 #ifndef MCONF_S_LQR_MAX_SPEED
 #define MCONF_S_LQR_MAX_SPEED           0.0 // Maximum Speed (mechanical rpm)
 #endif
 #ifndef MCONF_S_LQR_MAX_VOLTAGE_DROP
 #define MCONF_S_LQR_MAX_VOLTAGE_DROP    7.0 // Maximum Voltage drop
 #endif
+#ifndef MCONF_S_LQR_MIN_DUTY
+#define MCONF_S_LQR_MIN_DUTY            0.0 // Minimum duty cycle for LQR controller
+#endif
 #ifndef MCONF_S_LQR_MAX_DUTY
 #define MCONF_S_LQR_MAX_DUTY            0.0 // Maximum duty cycle
+#endif
+#ifndef MCONF_S_LQR_MAX_THRUST
+#define MCONF_S_LQR_MAX_THRUST          0.0 // Maximum thrust in Newton
+#endif
+#ifndef MCONF_S_LQR_MAX_THRUST_RATE
+#define MCONF_S_LQR_MAX_THRUST_RATE     0.0 // Maximum thrust in Newton/s
 #endif
 
 // Current control parameters
