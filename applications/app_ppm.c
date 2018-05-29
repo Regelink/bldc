@@ -249,6 +249,17 @@ static THD_FUNCTION(ppm_thread, arg) {
 			}
 			break;
 
+		case PPM_CTRL_TYPE_LQR_NOREV:
+			if (fabsf(servo_val) < 0.001) {
+				pulses_without_power++;
+			}
+
+			if (!(pulses_without_power < MIN_PULSES_WITHOUT_POWER && config.safe_start)) {
+				mc_interface_set_lqr_speed(servo_val * config.pid_max_erpm);
+				send_current = true;
+			}
+			break;
+
 		default:
 			continue;
 		}
