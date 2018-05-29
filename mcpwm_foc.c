@@ -1698,7 +1698,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		utils_truncate_number(&duty_filtered, -1.0, 1.0);
 
 		float duty_set = m_duty_cycle_set;
-		bool control_duty = m_control_mode == CONTROL_MODE_DUTY;
+		bool control_duty = (m_control_mode == CONTROL_MODE_DUTY)
+		                    || (m_control_mode == CONTROL_MODE_SPEED_LQR);
 
 		// When the filtered duty cycle in sensorless mode becomes low in brake mode, the
 		// observer has lost tracking. Use duty cycle control with the lowest duty cycle
@@ -2550,12 +2551,11 @@ static void run_pid_control_speed(float dt) {
 static void run_lqr_control_speed(float dt)
 {
 	static float u_filtered = FLT_MIN;
-	static float state[2] = { };
-	static float last_int_in[2] = { };
+	static float state[2] = { 0.0, 0.0 };
+	static float last_int_in[2] = { 0.0, 0.0 };
 	static float thrust = 0.0;
 	static enum lqr_run_state lqr_run_state = LQR_RUN_STATE_OFF;
-
-	float duty_set = 0.0;
+	static float duty_set = 0.0;
 
 	/* Return if control mode is not LQR speed or invalid parameter values detected */
 	if ((m_control_mode != CONTROL_MODE_SPEED_LQR)
@@ -2572,8 +2572,8 @@ static void run_lqr_control_speed(float dt)
 
 	/* Acquire set speed and actual speed, then apply thrust rate limiting */
 	const float set_speed_mech_rpm = limit_thrust_rate(dt, fabsf(m_speed_pid_set_rpm) * 2.0 / m_conf->motor_poles, &thrust);
-	const float act_speed = mcpwm_foc_get_rpm() * 2.0 / m_conf->motor_poles;
-	const float act_speed_rads = act_speed * 2.0 * M_PI / 60.0;
+	const float act_speed_mech_rpm = mcpwm_foc_get_rpm() * 2.0 / m_conf->motor_poles;
+	const float act_speed_rads = act_speed_mech_rpm * 2.0 * M_PI / 60.0;
 
 	switch (lqr_run_state) {
 	case LQR_RUN_STATE_OFF:
@@ -2582,15 +2582,15 @@ static void run_lqr_control_speed(float dt)
 		break;
 	case LQR_RUN_STATE_STARTING:
 		duty_set = m_conf->s_lqr_min_duty;
-		if ((act_speed > 0.9 * m_conf->s_lqr_min_speed)) lqr_run_state = LQR_RUN_STATE_RUNNING;
+		if ((act_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed)) lqr_run_state = LQR_RUN_STATE_RUNNING;
 		break;
 	case LQR_RUN_STATE_RUNNING:
 		{
 			/* Calculate set_voltage contributions */
 			const float set_u1 = m_conf->s_lqr_Nbar * set_speed_mech_rpm * 2.0 * M_PI / 60.0;
 			const float set_u2 = m_conf->s_lqr_max_voltage_drop
-								 * (set_speed_mech_rpm / m_conf->s_lqr_max_speed)
-								 * (set_speed_mech_rpm / m_conf->s_lqr_max_speed);
+			                     * (set_speed_mech_rpm / m_conf->s_lqr_max_speed)
+			                     * (set_speed_mech_rpm / m_conf->s_lqr_max_speed);
 
 			for (unsigned int i = 0; i < m_conf->s_lqr_oversampling_factor; i++) {
 				/* calculate u_set from u_filtered and the last duty cycle */
@@ -2620,7 +2620,7 @@ static void run_lqr_control_speed(float dt)
 					duty_set = 0.0;
 				}
 			}
-			if (act_speed < 0.8 * m_conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_STOPPING;
+			if (act_speed_mech_rpm < 0.8 * m_conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_STOPPING;
 		}
 		break;
 	case LQR_RUN_STATE_STOPPING:
@@ -2630,7 +2630,7 @@ static void run_lqr_control_speed(float dt)
 	}
 
 	utils_truncate_number(&duty_set, 0.0,  m_conf->s_lqr_max_duty);
-	m_iq_set = duty_set * m_conf->lo_current_max;
+	m_duty_cycle_set = duty_set;
 }
 
 /* Returns the thrust rate limited set speed */
@@ -2640,8 +2640,7 @@ static float limit_thrust_rate(float dt, float set_speed, float *thrust)
 
 	if ((m_conf->s_lqr_max_speed > 0.0) && (m_conf->motor_poles > 0)) {
 		thrust_coeff = m_conf->s_lqr_max_thrust
-		               / ((m_conf->s_lqr_max_speed * 2.0 / m_conf->motor_poles)
-		                  * (m_conf->s_lqr_max_speed * 2.0 / m_conf->motor_poles)); // N per rpm^2
+		               / (m_conf->s_lqr_max_speed * m_conf->s_lqr_max_speed); // N per rpm^2
 	} else {
 		thrust_coeff = 0.0;
 	}
