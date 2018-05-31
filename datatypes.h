@@ -245,11 +245,14 @@ typedef struct {
 	float s_lqr_voltage_filter_freq;
 	float s_lqr_min_speed;
 	float s_lqr_max_speed;
+	float s_lqr_max_speed_per_volt;
 	float s_lqr_max_voltage_drop;
 	float s_lqr_min_duty;
 	float s_lqr_max_duty;
 	float s_lqr_max_thrust;
 	float s_lqr_max_thrust_rate;
+	float s_lqr_trunc_voltage_min;
+	float s_lqr_trunc_voltage_max;
 	// Current controller
 	float cc_startup_boost_duty;
 	float cc_min_current;
@@ -300,7 +303,8 @@ typedef enum {
 	PPM_CTRL_TYPE_DUTY,
 	PPM_CTRL_TYPE_DUTY_NOREV,
 	PPM_CTRL_TYPE_PID,
-	PPM_CTRL_TYPE_PID_NOREV
+	PPM_CTRL_TYPE_PID_NOREV,
+	PPM_CTRL_TYPE_LQR_NOREV
 } ppm_control_type;
 
 typedef struct {

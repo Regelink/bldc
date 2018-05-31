@@ -384,11 +384,14 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		mcconf.s_lqr_voltage_filter_freq = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_min_speed = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_max_speed = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_max_speed_per_volt = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_max_voltage_drop = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_min_duty = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_max_duty = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_max_thrust = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_max_thrust_rate = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_trunc_voltage_min = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_trunc_voltage_max = buffer_get_float32_auto(data, &ind);
 
 		// Apply limits if they are defined
 #ifndef DISABLE_HW_LIMITS
@@ -566,11 +569,14 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_voltage_filter_freq, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_min_speed, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_speed, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_speed_per_volt, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_voltage_drop, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_min_duty, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_duty, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_thrust, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_thrust_rate, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_trunc_voltage_min, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_trunc_voltage_max, &ind);
 
 		commands_send_packet(send_buffer, ind);
 		break;
