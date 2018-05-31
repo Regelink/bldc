@@ -135,7 +135,7 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 		uint32_t* tAout, uint32_t* tBout, uint32_t* tCout, uint32_t *svm_sector);
 static void run_pid_control_pos(float angle_now, float angle_set, float dt);
 static void run_pid_control_speed(float dt);
-static void run_lqr_control_speed(float dt);
+static void run_lqr_control_speed(float dt, bool starting);
 static float limit_thrust_rate(float dt, float set_speed, float set_speed_filtered, float u_input, float *thrust);
 static void stop_pwm_hw(void);
 static void start_pwm_hw(void);
@@ -2065,7 +2065,7 @@ static THD_FUNCTION(timer_thread, arg) {
 				m_conf->foc_observer_gain * m_conf->foc_observer_gain_slow, m_conf->foc_observer_gain);
 
 		run_pid_control_speed(dt);
-		run_lqr_control_speed(dt);
+		run_lqr_control_speed(dt, (min_rpm_hyst_timer < 0.0) && (min_rpm_timer < 0.0));
 		chThdSleepMilliseconds(1);
 	}
 
@@ -2548,7 +2548,7 @@ static void run_pid_control_speed(float dt) {
 	m_iq_set = output * m_conf->lo_current_max;
 }
 
-static void run_lqr_control_speed(float dt)
+static void run_lqr_control_speed(float dt, bool starting)
 {
 	static float u_filtered = FLT_MIN;
 	static float state[2] = { 0.0, 0.0 };
@@ -2557,6 +2557,7 @@ static void run_lqr_control_speed(float dt)
 	static enum lqr_run_state lqr_run_state = LQR_RUN_STATE_OFF;
 	static float duty_set = 0.0;
 	static float set_speed_mech_rpm = 0.0;
+	static float startup_time = 0;
 
 	/* Return if control mode is not LQR speed or invalid parameter values detected */
 	if ((m_control_mode != CONTROL_MODE_SPEED_LQR)
@@ -2579,11 +2580,18 @@ static void run_lqr_control_speed(float dt)
 	switch (lqr_run_state) {
 	case LQR_RUN_STATE_OFF:
 		duty_set = 0.0;
-		if (set_speed_mech_rpm > 1.0) lqr_run_state = LQR_RUN_STATE_STARTING;
+		if (set_speed_mech_rpm > 1.0) {
+			lqr_run_state = LQR_RUN_STATE_STARTING;
+			startup_time = 1.0;
+		}
 		break;
 	case LQR_RUN_STATE_STARTING:
 		duty_set = m_conf->s_lqr_min_duty;
-		if ((act_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed)) lqr_run_state = LQR_RUN_STATE_RUNNING;
+		if ((startup_time < 0.0) && (act_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed)) {
+			lqr_run_state = LQR_RUN_STATE_RUNNING;
+		} else {
+			startup_time -= dt;
+		}
 		break;
 	case LQR_RUN_STATE_RUNNING:
 		{
