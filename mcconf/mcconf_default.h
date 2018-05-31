@@ -197,6 +197,9 @@
 #ifndef MCONF_S_LQR_MAX_SPEED
 #define MCONF_S_LQR_MAX_SPEED           0.0 // Maximum Speed (mechanical rpm)
 #endif
+#ifndef MCONF_S_LQR_MAX_SPEED_PER_VOLT
+#define MCONF_S_LQR_MAX_SPEED_PER_VOLT  90.0 // Maximum Speed per Volt (mechanical rpm)
+#endif
 #ifndef MCONF_S_LQR_MAX_VOLTAGE_DROP
 #define MCONF_S_LQR_MAX_VOLTAGE_DROP    7.0 // Maximum Voltage drop
 #endif
@@ -211,6 +214,12 @@
 #endif
 #ifndef MCONF_S_LQR_MAX_THRUST_RATE
 #define MCONF_S_LQR_MAX_THRUST_RATE     0.0 // Maximum thrust in Newton/s
+#endif
+#ifndef MCONF_S_LQR_TRUNC_VOLTAGE_MIN
+#define MCONF_S_LQR_TRUNC_VOLTAGE_MIN   42.0 // Minimum voltage to apply in maximum speed calculation
+#endif
+#ifndef MCONF_S_LQR_TRUNC_VOLTAGE_MAX
+#define MCONF_S_LQR_TRUNC_VOLTAGE_MAX   58.0 // Maximum voltage to apply in maximum speed calculation
 #endif
 
 // Current control parameters
