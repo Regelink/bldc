@@ -392,6 +392,7 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		mcconf.s_lqr_max_thrust_rate = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_trunc_voltage_min = buffer_get_float32_auto(data, &ind);
 		mcconf.s_lqr_trunc_voltage_max = buffer_get_float32_auto(data, &ind);
+		mcconf.s_lqr_startup_time = buffer_get_float32_auto(data, &ind);
 
 		// Apply limits if they are defined
 #ifndef DISABLE_HW_LIMITS
@@ -577,6 +578,7 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_max_thrust_rate, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_trunc_voltage_min, &ind);
 		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_trunc_voltage_max, &ind);
+		buffer_append_float32_auto(send_buffer, mcconf.s_lqr_startup_time, &ind);
 
 		commands_send_packet(send_buffer, ind);
 		break;

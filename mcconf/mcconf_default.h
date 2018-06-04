@@ -221,6 +221,9 @@
 #ifndef MCONF_S_LQR_TRUNC_VOLTAGE_MAX
 #define MCONF_S_LQR_TRUNC_VOLTAGE_MAX   58.0 // Maximum voltage to apply in maximum speed calculation
 #endif
+#ifndef MCONF_S_LQR_STARTUP_TIME
+#define MCONF_S_LQR_STARTUP_TIME        1.0 // Minimum time (seconds) required to spend in the starting state
+#endif
 
 // Current control parameters
 #ifndef MCCONF_CC_GAIN

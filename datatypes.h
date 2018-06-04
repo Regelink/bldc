@@ -253,6 +253,7 @@ typedef struct {
 	float s_lqr_max_thrust_rate;
 	float s_lqr_trunc_voltage_min;
 	float s_lqr_trunc_voltage_max;
+	float s_lqr_startup_time;
 	// Current controller
 	float cc_startup_boost_duty;
 	float cc_min_current;

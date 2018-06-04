@@ -296,6 +296,7 @@ void conf_general_get_default_mc_configuration(mc_configuration *conf) {
 	conf->s_lqr_max_thrust_rate = MCONF_S_LQR_MAX_THRUST_RATE;
 	conf->s_lqr_trunc_voltage_min = MCONF_S_LQR_TRUNC_VOLTAGE_MIN;
 	conf->s_lqr_trunc_voltage_max = MCONF_S_LQR_TRUNC_VOLTAGE_MAX;
+	conf->s_lqr_startup_time = MCONF_S_LQR_STARTUP_TIME;
 
 	conf->cc_startup_boost_duty = MCCONF_CC_STARTUP_BOOST_DUTY;
 	conf->cc_min_current = MCCONF_CC_MIN_CURRENT;

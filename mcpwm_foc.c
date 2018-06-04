@@ -2557,7 +2557,7 @@ static void run_lqr_control_speed(float dt, bool starting)
 	static enum lqr_run_state lqr_run_state = LQR_RUN_STATE_OFF;
 	static float duty_set = 0.0;
 	static float set_speed_mech_rpm = 0.0;
-	static float startup_time = 0;
+	static float startup_time = 0.0;
 
 	/* Return if control mode is not LQR speed or invalid parameter values detected */
 	if ((m_control_mode != CONTROL_MODE_SPEED_LQR)
@@ -2582,7 +2582,7 @@ static void run_lqr_control_speed(float dt, bool starting)
 		duty_set = 0.0;
 		if (set_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed) {
 			lqr_run_state = LQR_RUN_STATE_STARTING;
-			startup_time = 1.0;
+			startup_time = m_conf->s_lqr_startup_time;
 		}
 		break;
 	case LQR_RUN_STATE_STARTING:
