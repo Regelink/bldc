@@ -2580,7 +2580,7 @@ static void run_lqr_control_speed(float dt, bool starting)
 	switch (lqr_run_state) {
 	case LQR_RUN_STATE_OFF:
 		duty_set = 0.0;
-		if (set_speed_mech_rpm > 1.0) {
+		if (set_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed) {
 			lqr_run_state = LQR_RUN_STATE_STARTING;
 			startup_time = 1.0;
 		}
@@ -2634,7 +2634,7 @@ static void run_lqr_control_speed(float dt, bool starting)
 		break;
 	case LQR_RUN_STATE_STOPPING:
 		duty_set = 0.0;
-		if (set_speed_mech_rpm < 1.0) lqr_run_state = LQR_RUN_STATE_OFF;
+		if (set_speed_mech_rpm < 0.9 * m_conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_OFF;
 		break;
 	}
 
