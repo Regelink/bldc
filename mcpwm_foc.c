@@ -2662,6 +2662,7 @@ static float limit_thrust_rate(float dt, float set_speed, float set_speed_filter
 	/* The maximum thrust rate depends on the desired speed in relation to the maximum speed */
 	float max_thrust_rate_dynamic = m_conf->s_lqr_max_thrust_rate;
 
+	if (set_speed_filtered < 2.0 * m_conf->s_lqr_min_speed) max_thrust_rate_dynamic *= 0.33;
 	if (set_speed_filtered < 0.5 * max_speed) max_thrust_rate_dynamic *= 1.1;
 	if (set_speed_filtered < 0.7 * max_speed) max_thrust_rate_dynamic *= 1.5;
 	if (set_speed_filtered > 0.8 * max_speed) max_thrust_rate_dynamic *= 0.6;
