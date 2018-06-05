@@ -136,7 +136,7 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 static void run_pid_control_pos(float angle_now, float angle_set, float dt);
 static void run_pid_control_speed(float dt);
 static void run_lqr_control_speed(float dt, bool starting);
-static float limit_thrust_rate(float dt, float set_speed, float set_speed_filtered, float u_input, float *thrust);
+static void limit_thrust_rate(float dt, float u_input, float *set_speed_limited, float *thrust);
 static void stop_pwm_hw(void);
 static void start_pwm_hw(void);
 static int read_hall(void);
@@ -2573,7 +2573,7 @@ static void run_lqr_control_speed(float dt, bool starting)
 	ema_filter(u_input, &u_filtered, m_conf->s_lqr_voltage_filter_freq, dt);
 
 	/* Acquire set speed and actual speed, then apply thrust rate limiting */
-	set_speed_mech_rpm = limit_thrust_rate(dt, fabsf(m_speed_pid_set_rpm) * 2.0 / m_conf->motor_poles, set_speed_mech_rpm, u_filtered, &thrust);
+	limit_thrust_rate(dt, u_filtered, &set_speed_mech_rpm, &thrust);
 	const float act_speed_mech_rpm = mcpwm_foc_get_rpm() * 2.0 / m_conf->motor_poles;
 	const float act_speed_rads = act_speed_mech_rpm * 2.0 * M_PI / 60.0;
 
@@ -2587,6 +2587,10 @@ static void run_lqr_control_speed(float dt, bool starting)
 		break;
 	case LQR_RUN_STATE_STARTING:
 		duty_set = m_conf->s_lqr_min_duty;
+		/* Override the speed set value during startup,
+		 * so that the rate limiter doesn't jump when we enter the running state
+		 */
+		set_speed_mech_rpm = act_speed_mech_rpm;
 		if ((startup_time < 0.0) && (act_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed)) {
 			lqr_run_state = LQR_RUN_STATE_RUNNING;
 		} else {
@@ -2642,16 +2646,16 @@ static void run_lqr_control_speed(float dt, bool starting)
 	m_duty_cycle_set = duty_set;
 }
 
-/* Returns the thrust rate limited set speed
+/* Limits the speed set value according thrust rate boundaries
  * @param dt Timestep in seconds 
- * @param set_speed The desired speed set value
- * @param set_speed_filtered The filtered speed set value, used to scale the maximum thrust rate
  * @param u_input The input voltage
+ * @param set_speed_limited Pointer to the limited speed set value, used to scale the maximum thrust rate
  * @param thrust Pointer to the thrust from which the limited speed is derived
  */
-static float limit_thrust_rate(float dt, float set_speed, float set_speed_filtered, float u_input, float *thrust)
+static void limit_thrust_rate(float dt, float u_input, float *set_speed_limited, float *thrust)
 {
 	float thrust_coeff;
+	float set_speed = fabsf(m_speed_pid_set_rpm) * 2.0 / m_conf->motor_poles;
 
 	/* Speed limit depends on input voltage */
 	utils_truncate_number(&u_input, m_conf->s_lqr_trunc_voltage_min, m_conf->s_lqr_trunc_voltage_max);
@@ -2662,14 +2666,14 @@ static float limit_thrust_rate(float dt, float set_speed, float set_speed_filter
 	/* The maximum thrust rate depends on the desired speed in relation to the maximum speed */
 	float max_thrust_rate_dynamic = m_conf->s_lqr_max_thrust_rate;
 
-	if (set_speed_filtered < 2.0 * m_conf->s_lqr_min_speed) max_thrust_rate_dynamic *= 0.33;
-	if (set_speed_filtered < 0.5 * max_speed) max_thrust_rate_dynamic *= 1.1;
-	if (set_speed_filtered < 0.7 * max_speed) max_thrust_rate_dynamic *= 1.5;
-	if (set_speed_filtered > 0.8 * max_speed) max_thrust_rate_dynamic *= 0.6;
-	if (set_speed_filtered > 0.9 * max_speed) max_thrust_rate_dynamic *= 0.6;
-	if (set_speed_filtered > 0.95 * max_speed) max_thrust_rate_dynamic *= 0.7;
-	if (set_speed_filtered > 0.975 * max_speed) max_thrust_rate_dynamic *= 0.7;
-	if (set_speed_filtered > 0.9875 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	//if (*set_speed_limited < 2.0 * m_conf->s_lqr_min_speed) max_thrust_rate_dynamic *= 0.33;
+	if (*set_speed_limited < 0.5 * max_speed) max_thrust_rate_dynamic *= 1.1;
+	if (*set_speed_limited < 0.7 * max_speed) max_thrust_rate_dynamic *= 1.5;
+	if (*set_speed_limited > 0.8 * max_speed) max_thrust_rate_dynamic *= 0.6;
+	if (*set_speed_limited > 0.9 * max_speed) max_thrust_rate_dynamic *= 0.6;
+	if (*set_speed_limited > 0.95 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	if (*set_speed_limited > 0.975 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	if (*set_speed_limited > 0.9875 * max_speed) max_thrust_rate_dynamic *= 0.7;
 	/* Maximum allowed thrust rate for reducing thrust is different */
 	float max_thrust_rate_down = (2.0 * max_thrust_rate_dynamic + m_conf->s_lqr_max_thrust_rate) / 3.0;
 
@@ -2689,8 +2693,11 @@ static float limit_thrust_rate(float dt, float set_speed, float set_speed_filter
 	}
 
 	/* Return limited set speed */
-	if (thrust_coeff > 0.0) return sqrt(*thrust / thrust_coeff);
-	else return 0.0;
+	if (thrust_coeff > 0.0) {
+		*set_speed_limited = sqrt(*thrust / thrust_coeff);
+	} else {
+		*set_speed_limited = 0.0;
+	}
 }
 
 static void stop_pwm_hw(void) {
