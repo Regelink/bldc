@@ -2632,7 +2632,7 @@ static void run_lqr_control_speed(float dt, bool starting)
 					duty_set = 0.0;
 				}
 			}
-			if (act_speed_mech_rpm < 0.8 * m_conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_STOPPING;
+			if (act_speed_mech_rpm < 0.5 * m_conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_STOPPING;
 		}
 		break;
 	case LQR_RUN_STATE_STOPPING:
@@ -2676,8 +2676,8 @@ static void limit_thrust_rate(float dt, float u_input, float *set_speed_limited)
 	float max_thrust_rate_dynamic = m_conf->s_lqr_max_thrust_rate;
 
 	//if (*set_speed_limited < 2.0 * m_conf->s_lqr_min_speed) max_thrust_rate_dynamic *= 0.33;
-	if (*set_speed_limited < 0.5 * max_speed) max_thrust_rate_dynamic *= 1.1;
-	if (*set_speed_limited < 0.7 * max_speed) max_thrust_rate_dynamic *= 1.5;
+	//if (*set_speed_limited < 0.5 * max_speed) max_thrust_rate_dynamic *= 1.1;
+	//if (*set_speed_limited < 0.7 * max_speed) max_thrust_rate_dynamic *= 1.5;
 	if (*set_speed_limited > 0.8 * max_speed) max_thrust_rate_dynamic *= 0.6;
 	if (*set_speed_limited > 0.9 * max_speed) max_thrust_rate_dynamic *= 0.6;
 	if (*set_speed_limited > 0.95 * max_speed) max_thrust_rate_dynamic *= 0.7;
