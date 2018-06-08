@@ -145,6 +145,86 @@
 #define MCCONF_P_PID_ANG_DIV			1.0		// Divide angle by this value
 #endif
 
+// Speed LQR parameters
+#ifndef MCONF_S_LQR_A00
+#define MCONF_S_LQR_A00                 0.0 // Element 0,0 of matrix A
+#endif
+#ifndef MCONF_S_LQR_A01
+#define MCONF_S_LQR_A01                 0.0 // Element 0,1 of matrix A
+#endif
+#ifndef MCONF_S_LQR_A10
+#define MCONF_S_LQR_A10                 0.0 // Element 1,0 of matrix A
+#endif
+#ifndef MCONF_S_LQR_A11
+#define MCONF_S_LQR_A11                 0.0 // Element 1,1 of matrix A
+#endif
+#ifndef MCONF_S_LQR_B0
+#define MCONF_S_LQR_B0                  0.0 // Element 0 of vector B
+#endif
+#ifndef MCONF_S_LQR_B1
+#define MCONF_S_LQR_B1                  0.0 // Element 1 of vector B
+#endif
+#ifndef MCONF_S_LQR_C0
+#define MCONF_S_LQR_C0                  0.0 // Element 0 of vector C
+#endif
+#ifndef MCONF_S_LQR_C1
+#define MCONF_S_LQR_C1                  0.0 // Element 1 of vector C
+#endif
+#ifndef MCONF_S_LQR_K0
+#define MCONF_S_LQR_K0                  0.0 // Element 0 of vector K
+#endif
+#ifndef MCONF_S_LQR_K1
+#define MCONF_S_LQR_K1                  0.0 // Element 1 of vector K
+#endif
+#ifndef MCONF_S_LQR_L0
+#define MCONF_S_LQR_L0                  0.0 // Element 0 of vector L
+#endif
+#ifndef MCONF_S_LQR_L1
+#define MCONF_S_LQR_L1                  0.0 // Element 1 of vector L
+#endif
+#ifndef MCONF_S_LQR_NBAR
+#define MCONF_S_LQR_NBAR                0.0 // Feed-forward gain
+#endif
+#ifndef MCONF_S_LQR_OVERSAMPLING_FACTOR
+#define MCONF_S_LQR_OVERSAMPLING_FACTOR 10 // Oversampling factor
+#endif
+#ifndef MCONF_S_LQR_VOLTAGE_FILTER_FREQ
+#define MCONF_S_LQR_VOLTAGE_FILTER_FREQ 25.0 // Voltage filter frequency (Hz)
+#endif
+#ifndef MCONF_S_LQR_MIN_SPEED
+#define MCONF_S_LQR_MIN_SPEED           0.0 // Minimum Speed (mechanical rpm)
+#endif
+#ifndef MCONF_S_LQR_MAX_SPEED
+#define MCONF_S_LQR_MAX_SPEED           0.0 // Maximum Speed (mechanical rpm)
+#endif
+#ifndef MCONF_S_LQR_MAX_SPEED_PER_VOLT
+#define MCONF_S_LQR_MAX_SPEED_PER_VOLT  90.0 // Maximum Speed per Volt (mechanical rpm)
+#endif
+#ifndef MCONF_S_LQR_MAX_VOLTAGE_DROP
+#define MCONF_S_LQR_MAX_VOLTAGE_DROP    7.0 // Maximum Voltage drop
+#endif
+#ifndef MCONF_S_LQR_MIN_DUTY
+#define MCONF_S_LQR_MIN_DUTY            0.0 // Minimum duty cycle for LQR controller
+#endif
+#ifndef MCONF_S_LQR_MAX_DUTY
+#define MCONF_S_LQR_MAX_DUTY            0.0 // Maximum duty cycle
+#endif
+#ifndef MCONF_S_LQR_MAX_THRUST
+#define MCONF_S_LQR_MAX_THRUST          0.0 // Maximum thrust in Newton
+#endif
+#ifndef MCONF_S_LQR_MAX_THRUST_RATE
+#define MCONF_S_LQR_MAX_THRUST_RATE     0.0 // Maximum thrust in Newton/s
+#endif
+#ifndef MCONF_S_LQR_TRUNC_VOLTAGE_MIN
+#define MCONF_S_LQR_TRUNC_VOLTAGE_MIN   42.0 // Minimum voltage to apply in maximum speed calculation
+#endif
+#ifndef MCONF_S_LQR_TRUNC_VOLTAGE_MAX
+#define MCONF_S_LQR_TRUNC_VOLTAGE_MAX   58.0 // Maximum voltage to apply in maximum speed calculation
+#endif
+#ifndef MCONF_S_LQR_STARTUP_TIME
+#define MCONF_S_LQR_STARTUP_TIME        1.0 // Minimum time (seconds) required to spend in the starting state
+#endif
+
 // Current control parameters
 #ifndef MCCONF_CC_GAIN
 #define MCCONF_CC_GAIN					0.0046	// Current controller error gain
@@ -360,6 +440,9 @@
 #endif
 #ifndef MCCONF_M_NTC_MOTOR_BETA
 #define MCCONF_M_NTC_MOTOR_BETA			3380.0 // Beta value for motor termistor
+#endif
+#ifndef MCCONF_M_MOTOR_POLES
+#define MCCONF_M_MOTOR_POLES            14 // Motor poles
 #endif
 
 #endif /* MCCONF_DEFAULT_H_ */

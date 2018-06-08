@@ -149,6 +149,7 @@ static THD_FUNCTION(ppm_thread, arg) {
 		case PPM_CTRL_TYPE_CURRENT_NOREV:
 		case PPM_CTRL_TYPE_DUTY_NOREV:
 		case PPM_CTRL_TYPE_PID_NOREV:
+		case PPM_CTRL_TYPE_LQR_NOREV:
 			input_val = servo_val;
 			servo_val += 1.0;
 			servo_val /= 2.0;
@@ -245,6 +246,17 @@ static THD_FUNCTION(ppm_thread, arg) {
 
 			if (!(pulses_without_power < MIN_PULSES_WITHOUT_POWER && config.safe_start)) {
 				mc_interface_set_pid_speed(servo_val * config.pid_max_erpm);
+				send_current = true;
+			}
+			break;
+
+		case PPM_CTRL_TYPE_LQR_NOREV:
+			if (fabsf(servo_val) < 0.001) {
+				pulses_without_power++;
+			}
+
+			if (!(pulses_without_power < MIN_PULSES_WITHOUT_POWER && config.safe_start)) {
+				mc_interface_set_lqr_speed(servo_val * config.pid_max_erpm);
 				send_current = true;
 			}
 			break;

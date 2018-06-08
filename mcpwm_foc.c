@@ -25,6 +25,7 @@
 #include "mc_interface.h"
 #include "ch.h"
 #include "hal.h"
+#include "hw.h"
 #include "stm32f4xx_conf.h"
 #include "digital_filter.h"
 #include "utils.h"
@@ -36,6 +37,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <float.h>
 
 // Private types
 typedef struct {
@@ -72,6 +74,13 @@ typedef struct {
 	bool measure_inductance_now;
 	float measure_inductance_duty;
 } mc_sample_t;
+
+enum lqr_run_state {
+	LQR_RUN_STATE_OFF,
+	LQR_RUN_STATE_STARTING,
+	LQR_RUN_STATE_RUNNING,
+	LQR_RUN_STATE_STOPPING
+};
 
 // Private variables
 static volatile mc_configuration *m_conf;
@@ -126,6 +135,8 @@ static void svm(float alpha, float beta, uint32_t PWMHalfPeriod,
 		uint32_t* tAout, uint32_t* tBout, uint32_t* tCout, uint32_t *svm_sector);
 static void run_pid_control_pos(float angle_now, float angle_set, float dt);
 static void run_pid_control_speed(float dt);
+static void run_lqr_control_speed(float dt, bool starting);
+static void limit_thrust_rate(float dt, float u_input, float *set_speed_limited);
 static void stop_pwm_hw(void);
 static void start_pwm_hw(void);
 static int read_hall(void);
@@ -542,7 +553,23 @@ void mcpwm_foc_set_duty_noramp(float dutyCycle) {
  * The electrical RPM goal value to use.
  */
 void mcpwm_foc_set_pid_speed(float rpm) {
-	m_control_mode = CONTROL_MODE_SPEED;
+	m_control_mode = CONTROL_MODE_SPEED_PID;
+	m_speed_pid_set_rpm = rpm;
+
+	if (m_state != MC_STATE_RUNNING) {
+		m_state = MC_STATE_RUNNING;
+	}
+}
+
+/**
+ * Use LQR rpm control. Note that this value has to be multiplied by half of
+ * the number of motor poles.
+ *
+ * @param rpm
+ * The electrical RPM goal value to use.
+ */
+void mcpwm_foc_set_lqr_speed(float rpm) {
+	m_control_mode = CONTROL_MODE_SPEED_LQR;
 	m_speed_pid_set_rpm = rpm;
 
 	if (m_state != MC_STATE_RUNNING) {
@@ -1671,7 +1698,8 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		utils_truncate_number(&duty_filtered, -1.0, 1.0);
 
 		float duty_set = m_duty_cycle_set;
-		bool control_duty = m_control_mode == CONTROL_MODE_DUTY;
+		bool control_duty = (m_control_mode == CONTROL_MODE_DUTY)
+		                    || (m_control_mode == CONTROL_MODE_SPEED_LQR);
 
 		// When the filtered duty cycle in sensorless mode becomes low in brake mode, the
 		// observer has lost tracking. Use duty cycle control with the lowest duty cycle
@@ -1684,7 +1712,7 @@ void mcpwm_foc_adc_int_handler(void *p, uint32_t flags) {
 		}
 
 		// Brake when set ERPM is below min ERPM
-		if (m_control_mode == CONTROL_MODE_SPEED &&
+		if (m_control_mode == CONTROL_MODE_SPEED_PID &&
 				fabsf(m_speed_pid_set_rpm) < m_conf->s_pid_min_erpm) {
 			control_duty = true;
 			duty_set = 0.0;
@@ -2037,6 +2065,7 @@ static THD_FUNCTION(timer_thread, arg) {
 				m_conf->foc_observer_gain * m_conf->foc_observer_gain_slow, m_conf->foc_observer_gain);
 
 		run_pid_control_speed(dt);
+		run_lqr_control_speed(dt, (min_rpm_hyst_timer < 0.0) && (min_rpm_timer < 0.0));
 		chThdSleepMilliseconds(1);
 	}
 
@@ -2469,7 +2498,7 @@ static void run_pid_control_speed(float dt) {
 	float d_term;
 
 	// PID is off. Return.
-	if (m_control_mode != CONTROL_MODE_SPEED) {
+	if (m_control_mode != CONTROL_MODE_SPEED_PID) {
 		i_term = 0.0;
 		prev_error = 0.0;
 		return;
@@ -2517,6 +2546,159 @@ static void run_pid_control_speed(float dt) {
 	}
 
 	m_iq_set = output * m_conf->lo_current_max;
+}
+
+static void run_lqr_control_speed(float dt, bool starting)
+{
+	static float u_filtered = FLT_MIN;
+	static float state[2] = { 0.0, 0.0 };
+	static float last_int_in[2] = { 0.0, 0.0 };
+	static enum lqr_run_state lqr_run_state = LQR_RUN_STATE_OFF;
+	static float duty_set = 0.0;
+	static float set_speed_mech_rpm = 0.0;
+	static float startup_time = 0.0;
+
+	/* Return if control mode is not LQR speed or invalid parameter values detected */
+	if ((m_control_mode != CONTROL_MODE_SPEED_LQR)
+	    || (m_conf->motor_poles <= 0)
+		|| (m_conf->s_lqr_max_speed <= 0.0)
+		|| (m_conf->s_lqr_oversampling_factor < 1)) {
+		return;
+	}
+
+	/* Acquire input voltage and filter it (filter is initialized with first sample) */
+	const float u_input = GET_INPUT_VOLTAGE();
+	if (u_filtered == FLT_MIN) u_filtered = u_input;
+	ema_filter(u_input, &u_filtered, m_conf->s_lqr_voltage_filter_freq, dt);
+
+	/* Acquire set speed and actual speed, then apply thrust rate limiting */
+	limit_thrust_rate(dt, u_filtered, &set_speed_mech_rpm);
+	const float act_speed_mech_rpm = mcpwm_foc_get_rpm() * 2.0 / m_conf->motor_poles;
+	const float act_speed_rads = act_speed_mech_rpm * 2.0 * M_PI / 60.0;
+
+	switch (lqr_run_state) {
+	case LQR_RUN_STATE_OFF:
+		duty_set = 0.0;
+		if (set_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed) {
+			lqr_run_state = LQR_RUN_STATE_STARTING;
+			startup_time = m_conf->s_lqr_startup_time;
+		}
+		break;
+	case LQR_RUN_STATE_STARTING:
+		duty_set = m_conf->s_lqr_min_duty;
+		/* Override the speed set value during startup,
+		 * so that the rate limiter doesn't jump when we enter the running state
+		 */
+		set_speed_mech_rpm = act_speed_mech_rpm;
+		if ((startup_time < 0.0) && (act_speed_mech_rpm > 0.9 * m_conf->s_lqr_min_speed)) {
+			lqr_run_state = LQR_RUN_STATE_RUNNING;
+		} else {
+			startup_time -= dt;
+		}
+		break;
+	case LQR_RUN_STATE_RUNNING:
+		{
+			/* Calculate set_voltage contributions */
+			const float set_u1 = m_conf->s_lqr_Nbar * set_speed_mech_rpm * 2.0 * M_PI / 60.0;
+			const float set_u2 = m_conf->s_lqr_max_voltage_drop
+			                     * (set_speed_mech_rpm / m_conf->s_lqr_max_speed)
+			                     * (set_speed_mech_rpm / m_conf->s_lqr_max_speed);
+
+			for (unsigned int i = 0; i < m_conf->s_lqr_oversampling_factor; i++) {
+				/* calculate u_set from u_filtered and the last duty cycle */
+				const float u_set = u_filtered * duty_set;
+				const float est_speed = m_conf->s_lqr_C0 * state[0] + m_conf->s_lqr_C1 * state[1];
+
+				/* estimator:
+				 *    input:  u_set and act_speed_rads;
+				 *    output: state vector (speed, current)
+				 *
+				 * Calculate input of integrator:
+				 */
+				const float int_in[] = {
+					m_conf->s_lqr_B0 * u_set + m_conf->s_lqr_A00 * state[0] + m_conf->s_lqr_A01 * state[1] + m_conf->s_lqr_L0 * (act_speed_rads - est_speed),
+					m_conf->s_lqr_B1 * u_set + m_conf->s_lqr_A10 * state[0] + m_conf->s_lqr_A11 * state[1] + m_conf->s_lqr_L1 * (act_speed_rads - est_speed)
+				};
+				state[0] += (int_in[0] + last_int_in[0]) * dt / (2.0 * m_conf->s_lqr_oversampling_factor); // forward Euler integration
+				state[1] += (int_in[1] + last_int_in[1]) * dt / (2.0 * m_conf->s_lqr_oversampling_factor); // forward Euler integration
+				last_int_in[0] = int_in[0];
+				last_int_in[1] = int_in[1];
+
+				/* Calculate duty cycle */
+				const float set_u3 = m_conf->s_lqr_K0 * state[0] + m_conf->s_lqr_K1 * state[1];
+				if (u_filtered > 0.0) {
+					duty_set = (set_u1 + set_u2 - set_u3) / u_filtered;
+				} else {
+					duty_set = 0.0;
+				}
+			}
+			if (act_speed_mech_rpm < 0.5 * m_conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_STOPPING;
+		}
+		break;
+	case LQR_RUN_STATE_STOPPING:
+		duty_set = 0.0;
+		if (set_speed_mech_rpm < 0.9 * m_conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_OFF;
+		break;
+	}
+
+	utils_truncate_number(&duty_set, 0.0,  m_conf->s_lqr_max_duty);
+	m_duty_cycle_set = duty_set;
+}
+
+/* Limits the speed set value according thrust rate boundaries
+ * @param dt Timestep in seconds 
+ * @param u_input The input voltage
+ * @param set_speed_limited Pointer to the limited speed set value, used to scale the maximum thrust rate
+ */
+static void limit_thrust_rate(float dt, float u_input, float *set_speed_limited)
+{
+	float thrust_coeff;
+	float set_speed = fabsf(m_speed_pid_set_rpm) * 2.0 / m_conf->motor_poles;
+
+	/* Calculate the thrust coefficient from other parameters */
+	if ((m_conf->s_lqr_max_speed > 0.0) && (m_conf->motor_poles > 0)) {
+		thrust_coeff = m_conf->s_lqr_max_thrust
+		               / (m_conf->s_lqr_max_speed * m_conf->s_lqr_max_speed); // N per rpm^2
+	} else {
+		thrust_coeff = 0.0;
+	}
+	/* Calculate the previous thrust value using the set_speed_limited (from previous call) */
+	float thrust = *set_speed_limited * (*set_speed_limited) * thrust_coeff;
+
+	/* Speed limit depends on input voltage */
+	utils_truncate_number(&u_input, m_conf->s_lqr_trunc_voltage_min, m_conf->s_lqr_trunc_voltage_max);
+	float max_speed = u_input * m_conf->s_lqr_max_speed_per_volt;
+	/* On top of that respect the configured absolute speed limit */
+	if (max_speed > m_conf->s_lqr_max_speed) max_speed = m_conf->s_lqr_max_speed;
+	if (set_speed > max_speed) set_speed = max_speed;
+	float new_thrust = set_speed * set_speed * thrust_coeff;
+	/* The maximum thrust rate depends on the desired speed in relation to the maximum speed */
+	float max_thrust_rate_dynamic = m_conf->s_lqr_max_thrust_rate;
+
+	//if (*set_speed_limited < 2.0 * m_conf->s_lqr_min_speed) max_thrust_rate_dynamic *= 0.33;
+	//if (*set_speed_limited < 0.5 * max_speed) max_thrust_rate_dynamic *= 1.1;
+	//if (*set_speed_limited < 0.7 * max_speed) max_thrust_rate_dynamic *= 1.5;
+	if (*set_speed_limited > 0.8 * max_speed) max_thrust_rate_dynamic *= 0.6;
+	if (*set_speed_limited > 0.9 * max_speed) max_thrust_rate_dynamic *= 0.6;
+	if (*set_speed_limited > 0.95 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	if (*set_speed_limited > 0.975 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	if (*set_speed_limited > 0.9875 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	/* Maximum allowed thrust rate for reducing thrust is different */
+	float max_thrust_rate_down = (2.0 * max_thrust_rate_dynamic + m_conf->s_lqr_max_thrust_rate) / 3.0;
+
+	/* Limit the rate of change of the thrust */
+	if (new_thrust > thrust) {
+		thrust = fmin(new_thrust, thrust + max_thrust_rate_dynamic * dt);
+	} else {
+		thrust = fmax(new_thrust, thrust - max_thrust_rate_down * dt);
+	}
+
+	/* Return limited set speed */
+	if (thrust_coeff > 0.0) {
+		*set_speed_limited = sqrt(thrust / thrust_coeff);
+	} else {
+		*set_speed_limited = 0.0;
+	}
 }
 
 static void stop_pwm_hw(void) {

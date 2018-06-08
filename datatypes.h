@@ -73,13 +73,14 @@ typedef enum {
 
 typedef enum {
 	CONTROL_MODE_DUTY = 0,
-	CONTROL_MODE_SPEED,
+	CONTROL_MODE_SPEED_PID,
 	CONTROL_MODE_CURRENT,
 	CONTROL_MODE_CURRENT_BRAKE,
 	CONTROL_MODE_POS,
 	CONTROL_MODE_HANDBRAKE,
 	CONTROL_MODE_OPENLOOP,
-	CONTROL_MODE_NONE
+	CONTROL_MODE_NONE,
+	CONTROL_MODE_SPEED_LQR
 } mc_control_mode;
 
 typedef enum {
@@ -226,6 +227,33 @@ typedef struct {
 	float p_pid_kd;
 	float p_pid_kd_filter;
 	float p_pid_ang_div;
+	// Speed LQR
+	float s_lqr_A00;
+	float s_lqr_A01;
+	float s_lqr_A10;
+	float s_lqr_A11;
+	float s_lqr_B0;
+	float s_lqr_B1;
+	float s_lqr_C0;
+	float s_lqr_C1;
+	float s_lqr_K0;
+	float s_lqr_K1;
+	float s_lqr_L0;
+	float s_lqr_L1;
+	float s_lqr_Nbar;
+	uint32_t s_lqr_oversampling_factor;
+	float s_lqr_voltage_filter_freq;
+	float s_lqr_min_speed;
+	float s_lqr_max_speed;
+	float s_lqr_max_speed_per_volt;
+	float s_lqr_max_voltage_drop;
+	float s_lqr_min_duty;
+	float s_lqr_max_duty;
+	float s_lqr_max_thrust;
+	float s_lqr_max_thrust_rate;
+	float s_lqr_trunc_voltage_min;
+	float s_lqr_trunc_voltage_max;
+	float s_lqr_startup_time;
 	// Current controller
 	float cc_startup_boost_duty;
 	float cc_min_current;
@@ -244,6 +272,7 @@ typedef struct {
 	float m_bldc_f_sw_max;
 	float m_dc_f_sw;
 	float m_ntc_motor_beta;
+	uint8_t motor_poles;
 } mc_configuration;
 
 // Applications to use
@@ -275,7 +304,8 @@ typedef enum {
 	PPM_CTRL_TYPE_DUTY,
 	PPM_CTRL_TYPE_DUTY_NOREV,
 	PPM_CTRL_TYPE_PID,
-	PPM_CTRL_TYPE_PID_NOREV
+	PPM_CTRL_TYPE_PID_NOREV,
+	PPM_CTRL_TYPE_LQR_NOREV
 } ppm_control_type;
 
 typedef struct {
@@ -485,7 +515,8 @@ typedef enum {
 	COMM_FORWARD_CAN,
 	COMM_SET_CHUCK_DATA,
 	COMM_CUSTOM_APP_DATA,
-	COMM_NRF_START_PAIRING
+	COMM_NRF_START_PAIRING,
+	COMM_SET_RPM_LQR,
 } COMM_PACKET_ID;
 
 // CAN commands
@@ -503,7 +534,8 @@ typedef enum {
 	CAN_PACKET_SET_CURRENT_REL,
 	CAN_PACKET_SET_CURRENT_BRAKE_REL,
 	CAN_PACKET_SET_CURRENT_HANDBRAKE,
-	CAN_PACKET_SET_CURRENT_HANDBRAKE_REL
+	CAN_PACKET_SET_CURRENT_HANDBRAKE_REL,
+	CAN_PACKET_SET_RPM_LQR
 } CAN_PACKET_ID;
 
 // Logged fault data

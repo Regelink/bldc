@@ -610,7 +610,7 @@ void mcpwm_set_duty_noramp(float dutyCycle) {
  * The electrical RPM goal value to use.
  */
 void mcpwm_set_pid_speed(float rpm) {
-	control_mode = CONTROL_MODE_SPEED;
+	control_mode = CONTROL_MODE_SPEED_PID;
 	speed_pid_set_rpm = rpm;
 }
 
@@ -1009,9 +1009,10 @@ static void set_duty_cycle_ll(float dutyCycle) {
 	if (dutyCycle < conf->l_min_duty) {
 		float max_erpm_fbrake;
 #if BLDC_SPEED_CONTROL_CURRENT
-		if (control_mode == CONTROL_MODE_CURRENT ||
-				control_mode == CONTROL_MODE_CURRENT_BRAKE ||
-				control_mode == CONTROL_MODE_SPEED) {
+		if (control_mode == CONTROL_MODE_CURRENT
+			|| control_mode == CONTROL_MODE_CURRENT_BRAKE
+			|| control_mode == CONTROL_MODE_SPEED_PID
+			|| control_mode == CONTROL_MODE_SPEED_LQR) {
 #else
 		if (control_mode == CONTROL_MODE_CURRENT || control_mode == CONTROL_MODE_CURRENT_BRAKE) {
 #endif
@@ -1124,7 +1125,7 @@ static void run_pid_control_speed(void) {
 	float d_term;
 
 	// PID is off. Return.
-	if (control_mode != CONTROL_MODE_SPEED) {
+	if (control_mode != CONTROL_MODE_SPEED_PID) {
 #if BLDC_SPEED_CONTROL_CURRENT
 		i_term = 0.0;
 #else
@@ -1943,9 +1944,10 @@ void mcpwm_adc_int_handler(void *p, uint32_t flags) {
 		float dutycycle_now_tmp = dutycycle_now;
 
 #if BLDC_SPEED_CONTROL_CURRENT
-		if (control_mode == CONTROL_MODE_CURRENT ||
-				control_mode == CONTROL_MODE_POS ||
-				control_mode == CONTROL_MODE_SPEED) {
+		if (control_mode == CONTROL_MODE_CURRENT
+			|| control_mode == CONTROL_MODE_POS
+			|| control_mode == CONTROL_MODE_SPEED_PID
+			|| control_mode == CONTROL_MODE_SPEED_LQR) {
 #else
 		if (control_mode == CONTROL_MODE_CURRENT || control_mode == CONTROL_MODE_POS) {
 #endif

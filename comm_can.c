@@ -193,6 +193,12 @@ static THD_FUNCTION(cancom_process_thread, arg) {
 						timeout_reset();
 						break;
 
+					case CAN_PACKET_SET_RPM_LQR:
+						ind = 0;
+						mc_interface_set_lqr_speed(buffer_get_float32(rxmsg.data8, 1e0, &ind));
+						timeout_reset();
+						break;
+
 					case CAN_PACKET_SET_POS:
 						ind = 0;
 						mc_interface_set_pid_pos(buffer_get_float32(rxmsg.data8, 1e6, &ind));
@@ -507,6 +513,14 @@ void comm_can_set_rpm(uint8_t controller_id, float rpm) {
 	buffer_append_int32(buffer, (int32_t)rpm, &send_index);
 	comm_can_transmit_eid(controller_id |
 			((uint32_t)CAN_PACKET_SET_RPM << 8), buffer, send_index);
+}
+
+void comm_can_set_rpm_lqr(uint8_t controller_id, float rpm) {
+	int32_t send_index = 0;
+	uint8_t buffer[4];
+	buffer_append_int32(buffer, (int32_t)rpm, &send_index);
+	comm_can_transmit_eid(controller_id |
+			((uint32_t)CAN_PACKET_SET_RPM_LQR << 8), buffer, send_index);
 }
 
 void comm_can_set_pos(uint8_t controller_id, float pos) {
