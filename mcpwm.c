@@ -1249,7 +1249,7 @@ static void run_pid_control_speed(void) {
 static void run_lqr_control_speed(float dt)
 {
 	static float u_filtered = FLT_MIN;
-	static float state[2] = { 0.0, 0.0 };
+	static float lqr_state[2] = { 0.0, 0.0 };
 	static float last_int_in[2] = { 0.0, 0.0 };
 	static enum lqr_run_state lqr_run_state = LQR_RUN_STATE_OFF;
 	static float duty_set = 0.0;
@@ -1305,7 +1305,7 @@ static void run_lqr_control_speed(float dt)
 			for (unsigned int i = 0; i < conf->s_lqr_oversampling_factor; i++) {
 				/* calculate u_set from u_filtered and the last duty cycle */
 				const float u_set = u_filtered * duty_set;
-				const float est_speed = conf->s_lqr_C0 * state[0] + conf->s_lqr_C1 * state[1];
+				const float est_speed = conf->s_lqr_C0 * lqr_state[0] + conf->s_lqr_C1 * lqr_state[1];
 
 				/* estimator:
 				 *    input:  u_set and act_speed_rads;
@@ -1314,16 +1314,16 @@ static void run_lqr_control_speed(float dt)
 				 * Calculate input of integrator:
 				 */
 				const float int_in[] = {
-					conf->s_lqr_B0 * u_set + conf->s_lqr_A00 * state[0] + conf->s_lqr_A01 * state[1] + conf->s_lqr_L0 * (act_speed_rads - est_speed),
-					conf->s_lqr_B1 * u_set + conf->s_lqr_A10 * state[0] + conf->s_lqr_A11 * state[1] + conf->s_lqr_L1 * (act_speed_rads - est_speed)
+					conf->s_lqr_B0 * u_set + conf->s_lqr_A00 * lqr_state[0] + conf->s_lqr_A01 * lqr_state[1] + conf->s_lqr_L0 * (act_speed_rads - est_speed),
+					conf->s_lqr_B1 * u_set + conf->s_lqr_A10 * lqr_state[0] + conf->s_lqr_A11 * lqr_state[1] + conf->s_lqr_L1 * (act_speed_rads - est_speed)
 				};
-				state[0] += (int_in[0] + last_int_in[0]) * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
-				state[1] += (int_in[1] + last_int_in[1]) * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
+				lqr_state[0] += (int_in[0] + last_int_in[0]) * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
+				lqr_state[1] += (int_in[1] + last_int_in[1]) * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
 				last_int_in[0] = int_in[0];
 				last_int_in[1] = int_in[1];
 
 				/* Calculate duty cycle */
-				const float set_u3 = conf->s_lqr_K0 * state[0] + conf->s_lqr_K1 * state[1];
+				const float set_u3 = conf->s_lqr_K0 * lqr_state[0] + conf->s_lqr_K1 * lqr_state[1];
 				if (u_filtered > 0.0) {
 					duty_set = (set_u1 + set_u2 - set_u3) / u_filtered;
 				} else {
@@ -1340,7 +1340,8 @@ static void run_lqr_control_speed(float dt)
 	}
 
 	utils_truncate_number(&duty_set, 0.0,  conf->s_lqr_max_duty);
-	dutycycle_set = duty_set;
+	set_duty_cycle_hl(duty_set);
+	//dutycycle_set = duty_set;
 }
 
 /* Limits the speed set value according thrust rate boundaries
