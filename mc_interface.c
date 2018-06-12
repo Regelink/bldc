@@ -392,7 +392,7 @@ void mc_interface_set_lqr_speed(float rpm) {
 	switch (m_conf.motor_type) {
 	case MOTOR_TYPE_BLDC:
 	case MOTOR_TYPE_DC:
-		//FIXME mcpwm_set_lqr_speed(DIR_MULT * rpm);
+		mcpwm_set_lqr_speed(DIR_MULT * rpm);
 		break;
 
 	case MOTOR_TYPE_FOC:
