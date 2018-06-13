@@ -32,6 +32,7 @@
 #include "ledpwm.h"
 #include "terminal.h"
 #include "encoder.h"
+#include "commands.h"
 
 // Structs
 typedef struct {
@@ -1033,7 +1034,8 @@ static void set_duty_cycle_ll(float dutyCycle) {
 #if BLDC_SPEED_CONTROL_CURRENT
 		if (control_mode == CONTROL_MODE_CURRENT
 			|| control_mode == CONTROL_MODE_CURRENT_BRAKE
-			|| control_mode == CONTROL_MODE_SPEED_PID) {
+			|| control_mode == CONTROL_MODE_SPEED_PID
+			|| control_mode == CONTROL_MODE_SPEED_LQR) {
 #else
 		if (control_mode == CONTROL_MODE_CURRENT || control_mode == CONTROL_MODE_CURRENT_BRAKE) {
 #endif
@@ -1254,6 +1256,7 @@ static void run_lqr_control_speed(float dt)
 	static float duty_set = 0.0;
 	static float set_speed_mech_rpm = 0.0;
 	static float startup_time = 0.0;
+	static unsigned n = 0;
 
 	/* Return if control mode is not LQR speed or invalid parameter values detected */
 	if ((control_mode != CONTROL_MODE_SPEED_LQR)
@@ -1265,7 +1268,22 @@ static void run_lqr_control_speed(float dt)
 
 	/* Acquire input voltage and filter it (filter is initialized with first sample) */
 	const float u_input = GET_INPUT_VOLTAGE();
-	if (u_filtered == FLT_MIN) u_filtered = u_input;
+	if (u_filtered == FLT_MIN) {
+		u_filtered = u_input;
+		/* Just verify the transmitted LQR parameters */
+		commands_printf("A[0][0] = %f", (double)conf->s_lqr_A00);
+		commands_printf("A[0][1] = %f", (double)conf->s_lqr_A01);
+		commands_printf("A[1][0] = %f", (double)conf->s_lqr_A10);
+		commands_printf("A[1][1] = %f", (double)conf->s_lqr_A11);
+		commands_printf("B[0] = %f", (double)conf->s_lqr_B0);
+		commands_printf("B[1] = %f", (double)conf->s_lqr_B1);
+		commands_printf("C[0] = %f", (double)conf->s_lqr_C0);
+		commands_printf("C[1] = %f", (double)conf->s_lqr_C1);
+		commands_printf("L[0] = %f", (double)conf->s_lqr_L0);
+		commands_printf("L[1] = %f", (double)conf->s_lqr_L1);
+		commands_printf("K[0] = %f", (double)conf->s_lqr_K0);
+		commands_printf("K[1] = %f", (double)conf->s_lqr_K1);
+	}
 	ema_filter(u_input, &u_filtered, conf->s_lqr_voltage_filter_freq, dt);
 
 	/* Acquire set speed and actual speed, then apply thrust rate limiting */
@@ -1279,6 +1297,7 @@ static void run_lqr_control_speed(float dt)
 		if (set_speed_mech_rpm > 0.9 * conf->s_lqr_min_speed) {
 			lqr_run_state = LQR_RUN_STATE_STARTING;
 			startup_time = conf->s_lqr_startup_time;
+			commands_printf("LQR_RUN_STATE_OFF -> LQR_RUN_STATE_STARTING");
 		}
 		break;
 	case LQR_RUN_STATE_STARTING:
@@ -1289,13 +1308,15 @@ static void run_lqr_control_speed(float dt)
 		set_speed_mech_rpm = act_speed_mech_rpm;
 		if ((startup_time < 0.0) && (act_speed_mech_rpm > 0.9 * conf->s_lqr_min_speed)) {
 			lqr_run_state = LQR_RUN_STATE_RUNNING;
+			commands_printf("LQR_RUN_STATE_STARTING -> LQR_RUN_STATE_RUNNING");
 		} else {
 			startup_time -= dt;
 		}
 		break;
 	case LQR_RUN_STATE_RUNNING:
-		if (true) {
-			const float u_set = speed_pid_set_rpm * 2.0 / conf->motor_poles / conf->s_lqr_max_speed_per_volt;
+		if (false) {
+			//const float u_set = speed_pid_set_rpm * 2.0 / conf->motor_poles / conf->s_lqr_max_speed_per_volt;
+			const float u_set = set_speed_mech_rpm / conf->s_lqr_max_speed_per_volt;
 			duty_set = (u_set / u_filtered) * (1 + 0.22 * (u_set / u_filtered));
 		} else {
 			/* Calculate set_voltage contributions */
@@ -1319,8 +1340,10 @@ static void run_lqr_control_speed(float dt)
 					conf->s_lqr_B0 * u_set + conf->s_lqr_A00 * lqr_state[0] + conf->s_lqr_A01 * lqr_state[1] + conf->s_lqr_L0 * (act_speed_rads - est_speed),
 					conf->s_lqr_B1 * u_set + conf->s_lqr_A10 * lqr_state[0] + conf->s_lqr_A11 * lqr_state[1] + conf->s_lqr_L1 * (act_speed_rads - est_speed)
 				};
-				lqr_state[0] += (int_in[0] + last_int_in[0]) * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
-				lqr_state[1] += (int_in[1] + last_int_in[1]) * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
+				lqr_state[0] += int_in[0] * dt / (2.0 * conf->s_lqr_oversampling_factor)
+				                + last_int_in[0] * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
+				lqr_state[1] += int_in[1] * dt / (2.0 * conf->s_lqr_oversampling_factor)
+				                + last_int_in[1] * dt / (2.0 * conf->s_lqr_oversampling_factor); // forward Euler integration
 				last_int_in[0] = int_in[0];
 				last_int_in[1] = int_in[1];
 
@@ -1332,17 +1355,34 @@ static void run_lqr_control_speed(float dt)
 					duty_set = 0.0;
 				}
 			}
-			if (act_speed_mech_rpm < 0.5 * conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_STOPPING;
+
+			/* Debug print the state every second */
+			if (n % 1000 == 0) {
+			//	commands_printf("u_filtered = %f", (double)u_filtered);
+				commands_printf("last_int_in[0] = %f", (double)last_int_in[0]);
+				commands_printf("last_int_in[1] = %f", (double)last_int_in[1]);
+				commands_printf("lqr_state[0] = %f", (double)lqr_state[0]);
+				commands_printf("lqr_state[1] = %f", (double)lqr_state[1]);
+			}
+
+			if (act_speed_mech_rpm < 0.5 * conf->s_lqr_min_speed) {
+				lqr_run_state = LQR_RUN_STATE_STOPPING;
+				commands_printf("LQR_RUN_STATE_RUNNING -> LQR_RUN_STATE_STOPPING");
+			}
 		}
 		break;
 	case LQR_RUN_STATE_STOPPING:
 		duty_set = 0.0;
-		if (set_speed_mech_rpm < 0.9 * conf->s_lqr_min_speed) lqr_run_state = LQR_RUN_STATE_OFF;
+		if (set_speed_mech_rpm < 0.9 * conf->s_lqr_min_speed) {
+			lqr_run_state = LQR_RUN_STATE_OFF;
+			commands_printf("LQR_RUN_STATE_STOPPING -> LQR_RUN_STATE_OFF");
+		}
 		break;
 	}
 
 	utils_truncate_number(&duty_set, 0.0,  conf->s_lqr_max_duty);
 	set_duty_cycle_hl(duty_set);
+	n++;
 }
 
 /* Limits the speed set value according thrust rate boundaries
@@ -1375,22 +1415,20 @@ static void limit_thrust_rate(float dt, float u_input, float *set_speed_limited)
 	/* The maximum thrust rate depends on the desired speed in relation to the maximum speed */
 	float max_thrust_rate_dynamic = conf->s_lqr_max_thrust_rate;
 
-	//if (*set_speed_limited < 2.0 * conf->s_lqr_min_speed) max_thrust_rate_dynamic *= 0.33;
-	//if (*set_speed_limited < 0.5 * max_speed) max_thrust_rate_dynamic *= 1.1;
-	//if (*set_speed_limited < 0.7 * max_speed) max_thrust_rate_dynamic *= 1.5;
-	if (*set_speed_limited > 0.8 * max_speed) max_thrust_rate_dynamic *= 0.6;
-	if (*set_speed_limited > 0.9 * max_speed) max_thrust_rate_dynamic *= 0.6;
-	if (*set_speed_limited > 0.95 * max_speed) max_thrust_rate_dynamic *= 0.7;
-	if (*set_speed_limited > 0.975 * max_speed) max_thrust_rate_dynamic *= 0.7;
-	if (*set_speed_limited > 0.9875 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	if (*set_speed_limited < 0.35 * max_speed) max_thrust_rate_dynamic *= 0.4;
+	//if (*set_speed_limited > 0.8 * max_speed) max_thrust_rate_dynamic *= 0.6;
+	//if (*set_speed_limited > 0.9 * max_speed) max_thrust_rate_dynamic *= 0.6;
+	//if (*set_speed_limited > 0.95 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	//if (*set_speed_limited > 0.975 * max_speed) max_thrust_rate_dynamic *= 0.7;
+	//if (*set_speed_limited > 0.9875 * max_speed) max_thrust_rate_dynamic *= 0.7;
 	/* Maximum allowed thrust rate for reducing thrust is different */
-	float max_thrust_rate_down = (2.0 * max_thrust_rate_dynamic + conf->s_lqr_max_thrust_rate) / 3.0;
+	//float max_thrust_rate_down = (2.0 * max_thrust_rate_dynamic + conf->s_lqr_max_thrust_rate) / 3.0;
 
 	/* Limit the rate of change of the thrust */
 	if (new_thrust > thrust) {
 		thrust = fmin(new_thrust, thrust + max_thrust_rate_dynamic * dt);
 	} else {
-		thrust = fmax(new_thrust, thrust - max_thrust_rate_down * dt);
+		thrust = fmax(new_thrust, thrust - max_thrust_rate_dynamic * dt);
 	}
 
 	/* Return limited set speed */
