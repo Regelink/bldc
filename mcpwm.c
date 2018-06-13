@@ -1294,7 +1294,10 @@ static void run_lqr_control_speed(float dt)
 		}
 		break;
 	case LQR_RUN_STATE_RUNNING:
-		{
+		if (true) {
+			const float u_set = speed_pid_set_rpm * 2.0 / conf->motor_poles / conf->s_lqr_max_speed_per_volt;
+			duty_set = (u_set / u_filtered) * (1 + 0.22 * (u_set / u_filtered));
+		} else {
 			/* Calculate set_voltage contributions */
 			const float set_u1 = conf->s_lqr_Nbar * set_speed_mech_rpm * 2.0 * M_PI / 60.0;
 			const float set_u2 = conf->s_lqr_max_voltage_drop
@@ -1340,7 +1343,6 @@ static void run_lqr_control_speed(float dt)
 
 	utils_truncate_number(&duty_set, 0.0,  conf->s_lqr_max_duty);
 	set_duty_cycle_hl(duty_set);
-	//dutycycle_set = duty_set;
 }
 
 /* Limits the speed set value according thrust rate boundaries
