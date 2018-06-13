@@ -1295,7 +1295,8 @@ static void run_lqr_control_speed(float dt)
 		break;
 	case LQR_RUN_STATE_RUNNING:
 		if (true) {
-			const float u_set = speed_pid_set_rpm * 2.0 / conf->motor_poles / conf->s_lqr_max_speed_per_volt;
+			//const float u_set = speed_pid_set_rpm * 2.0 / conf->motor_poles / conf->s_lqr_max_speed_per_volt;
+			const float u_set = set_speed_mech_rpm / conf->s_lqr_max_speed_per_volt;
 			duty_set = (u_set / u_filtered) * (1 + 0.22 * (u_set / u_filtered));
 		} else {
 			/* Calculate set_voltage contributions */
