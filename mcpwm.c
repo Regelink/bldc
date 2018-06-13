@@ -1033,8 +1033,7 @@ static void set_duty_cycle_ll(float dutyCycle) {
 #if BLDC_SPEED_CONTROL_CURRENT
 		if (control_mode == CONTROL_MODE_CURRENT
 			|| control_mode == CONTROL_MODE_CURRENT_BRAKE
-			|| control_mode == CONTROL_MODE_SPEED_PID
-			|| control_mode == CONTROL_MODE_SPEED_LQR) {
+			|| control_mode == CONTROL_MODE_SPEED_PID) {
 #else
 		if (control_mode == CONTROL_MODE_CURRENT || control_mode == CONTROL_MODE_CURRENT_BRAKE) {
 #endif
@@ -2123,8 +2122,7 @@ void mcpwm_adc_int_handler(void *p, uint32_t flags) {
 #if BLDC_SPEED_CONTROL_CURRENT
 		if (control_mode == CONTROL_MODE_CURRENT
 			|| control_mode == CONTROL_MODE_POS
-			|| control_mode == CONTROL_MODE_SPEED_PID
-			|| control_mode == CONTROL_MODE_SPEED_LQR) {
+			|| control_mode == CONTROL_MODE_SPEED_PID) {
 #else
 		if (control_mode == CONTROL_MODE_CURRENT || control_mode == CONTROL_MODE_POS) {
 #endif
