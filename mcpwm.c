@@ -51,7 +51,8 @@ enum lqr_run_state {
 	LQR_RUN_STATE_OFF,
 	LQR_RUN_STATE_STARTING,
 	LQR_RUN_STATE_RUNNING,
-	LQR_RUN_STATE_STOPPING
+	LQR_RUN_STATE_STOPPING,
+	LQR_RUN_STATE_PRE_BRAKING,
 };
 
 // Private variables
@@ -1034,8 +1035,7 @@ static void set_duty_cycle_ll(float dutyCycle) {
 #if BLDC_SPEED_CONTROL_CURRENT
 		if (control_mode == CONTROL_MODE_CURRENT
 			|| control_mode == CONTROL_MODE_CURRENT_BRAKE
-			|| control_mode == CONTROL_MODE_SPEED_PID
-			|| control_mode == CONTROL_MODE_SPEED_LQR) {
+			|| control_mode == CONTROL_MODE_SPEED_PID) {
 #else
 		if (control_mode == CONTROL_MODE_CURRENT || control_mode == CONTROL_MODE_CURRENT_BRAKE) {
 #endif
@@ -1256,13 +1256,14 @@ static void run_lqr_control_speed(float dt)
 	static float duty_set = 0.0;
 	static float set_speed_mech_rpm = 0.0;
 	static float startup_time = 0.0;
-	static unsigned n = 0;
+	static unsigned state_time = 0;
 
 	/* Return if control mode is not LQR speed or invalid parameter values detected */
 	if ((control_mode != CONTROL_MODE_SPEED_LQR)
 	    || (conf->motor_poles <= 0)
-		|| (conf->s_lqr_max_speed <= 0.0)
-		|| (conf->s_lqr_oversampling_factor < 1)) {
+	    || (conf->s_lqr_max_speed <= 0.0)
+	    || (conf->s_lqr_oversampling_factor < 1)) {
+		lqr_run_state = LQR_RUN_STATE_OFF;
 		return;
 	}
 
@@ -1270,19 +1271,6 @@ static void run_lqr_control_speed(float dt)
 	const float u_input = GET_INPUT_VOLTAGE();
 	if (u_filtered == FLT_MIN) {
 		u_filtered = u_input;
-		/* Just verify the transmitted LQR parameters */
-		commands_printf("A[0][0] = %f", (double)conf->s_lqr_A00);
-		commands_printf("A[0][1] = %f", (double)conf->s_lqr_A01);
-		commands_printf("A[1][0] = %f", (double)conf->s_lqr_A10);
-		commands_printf("A[1][1] = %f", (double)conf->s_lqr_A11);
-		commands_printf("B[0] = %f", (double)conf->s_lqr_B0);
-		commands_printf("B[1] = %f", (double)conf->s_lqr_B1);
-		commands_printf("C[0] = %f", (double)conf->s_lqr_C0);
-		commands_printf("C[1] = %f", (double)conf->s_lqr_C1);
-		commands_printf("L[0] = %f", (double)conf->s_lqr_L0);
-		commands_printf("L[1] = %f", (double)conf->s_lqr_L1);
-		commands_printf("K[0] = %f", (double)conf->s_lqr_K0);
-		commands_printf("K[1] = %f", (double)conf->s_lqr_K1);
 	}
 	ema_filter(u_input, &u_filtered, conf->s_lqr_voltage_filter_freq, dt);
 
@@ -1314,11 +1302,7 @@ static void run_lqr_control_speed(float dt)
 		}
 		break;
 	case LQR_RUN_STATE_RUNNING:
-		if (false) {
-			//const float u_set = speed_pid_set_rpm * 2.0 / conf->motor_poles / conf->s_lqr_max_speed_per_volt;
-			const float u_set = set_speed_mech_rpm / conf->s_lqr_max_speed_per_volt;
-			duty_set = (u_set / u_filtered) * (1 + 0.22 * (u_set / u_filtered));
-		} else {
+		{
 			/* Calculate set_voltage contributions */
 			const float set_u1 = conf->s_lqr_Nbar * set_speed_mech_rpm * 2.0 * M_PI / 60.0;
 			const float set_u2 = conf->s_lqr_max_voltage_drop
@@ -1356,33 +1340,38 @@ static void run_lqr_control_speed(float dt)
 				}
 			}
 
-			/* Debug print the state every second */
-			if (n % 1000 == 0) {
-			//	commands_printf("u_filtered = %f", (double)u_filtered);
-				commands_printf("last_int_in[0] = %f", (double)last_int_in[0]);
-				commands_printf("last_int_in[1] = %f", (double)last_int_in[1]);
-				commands_printf("lqr_state[0] = %f", (double)lqr_state[0]);
-				commands_printf("lqr_state[1] = %f", (double)lqr_state[1]);
-			}
-
 			if (act_speed_mech_rpm < 0.5 * conf->s_lqr_min_speed) {
 				lqr_run_state = LQR_RUN_STATE_STOPPING;
+				state_time = 0;
 				commands_printf("LQR_RUN_STATE_RUNNING -> LQR_RUN_STATE_STOPPING");
 			}
 		}
 		break;
 	case LQR_RUN_STATE_STOPPING:
 		duty_set = 0.0;
-		if (set_speed_mech_rpm < 0.9 * conf->s_lqr_min_speed) {
+		if (state_time > 1000) {
+			lqr_run_state = LQR_RUN_STATE_PRE_BRAKING;
+			state_time = 0;
+			commands_printf("LQR_RUN_STATE_STOPPING -> LQR_RUN_STATE_PRE_BRAKING");
+		} else {
+			state_time++;
+		}
+		break;
+	case LQR_RUN_STATE_PRE_BRAKING:
+		mcpwm_stop_pwm();
+		if (state_time > 1000)
+		{
+			/* Finally switch to off (and apply brake again) */
 			lqr_run_state = LQR_RUN_STATE_OFF;
-			commands_printf("LQR_RUN_STATE_STOPPING -> LQR_RUN_STATE_OFF");
+			commands_printf("LQR_RUN_STATE_PRE_BRAKING -> LQR_RUN_STATE_OFF");
+		} else {
+			state_time++;
 		}
 		break;
 	}
 
 	utils_truncate_number(&duty_set, 0.0,  conf->s_lqr_max_duty);
-	set_duty_cycle_hl(duty_set);
-	n++;
+	if (lqr_run_state != LQR_RUN_STATE_PRE_BRAKING) set_duty_cycle_hl(duty_set);
 }
 
 /* Limits the speed set value according thrust rate boundaries
