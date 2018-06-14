@@ -1340,7 +1340,8 @@ static void run_lqr_control_speed(float dt)
 				}
 			}
 
-			if (act_speed_mech_rpm < 0.5 * conf->s_lqr_min_speed) {
+			if ((set_speed_mech_rpm < 0.5 * conf->s_lqr_min_speed)
+			    && (act_speed_mech_rpm < 0.5 * conf->s_lqr_min_speed)) {
 				lqr_run_state = LQR_RUN_STATE_STOPPING;
 				state_time = 0;
 				commands_printf("LQR_RUN_STATE_RUNNING -> LQR_RUN_STATE_STOPPING");
