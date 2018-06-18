@@ -49,10 +49,10 @@ typedef struct {
 
 enum lqr_run_state {
 	LQR_RUN_STATE_OFF,
+	LQR_RUN_STATE_IDLE,
 	LQR_RUN_STATE_STARTING,
 	LQR_RUN_STATE_RUNNING,
-	LQR_RUN_STATE_STOPPING,
-	LQR_RUN_STATE_PRE_BRAKING,
+	LQR_RUN_STATE_STOPPING
 };
 
 // Private variables
@@ -1263,6 +1263,7 @@ static void run_lqr_control_speed(float dt)
 	    || (conf->motor_poles <= 0)
 	    || (conf->s_lqr_max_speed <= 0.0)
 	    || (conf->s_lqr_oversampling_factor < 1)) {
+		if (lqr_run_state != LQR_RUN_STATE_OFF) state_time = 0;
 		lqr_run_state = LQR_RUN_STATE_OFF;
 		return;
 	}
@@ -1281,12 +1282,22 @@ static void run_lqr_control_speed(float dt)
 
 	switch (lqr_run_state) {
 	case LQR_RUN_STATE_OFF:
+		stop_pwm_ll();
+		if (state_time > 1000) {
+			/* Finally switch to idle (and apply brake again) */
+			lqr_run_state = LQR_RUN_STATE_IDLE;
+			//commands_printf("LQR_RUN_STATE_OFF -> LQR_RUN_STATE_IDLE");
+		} else {
+			state_time++;
+		}
+		break;
+	case LQR_RUN_STATE_IDLE:
 		duty_set = 0.0;
 		if (set_speed_mech_rpm > 0.9 * conf->s_lqr_min_speed) {
 			lqr_run_state = LQR_RUN_STATE_STARTING;
 			startup_time = conf->s_lqr_startup_time;
-			commands_printf("LQR_RUN_STATE_OFF -> LQR_RUN_STATE_STARTING");
-		}
+			//commands_printf("LQR_RUN_STATE_IDLE -> LQR_RUN_STATE_STARTING");
+		} 
 		break;
 	case LQR_RUN_STATE_STARTING:
 		duty_set = conf->s_lqr_min_duty;
@@ -1296,7 +1307,7 @@ static void run_lqr_control_speed(float dt)
 		set_speed_mech_rpm = act_speed_mech_rpm;
 		if ((startup_time < 0.0) && (act_speed_mech_rpm > 0.9 * conf->s_lqr_min_speed)) {
 			lqr_run_state = LQR_RUN_STATE_RUNNING;
-			commands_printf("LQR_RUN_STATE_STARTING -> LQR_RUN_STATE_RUNNING");
+			//commands_printf("LQR_RUN_STATE_STARTING -> LQR_RUN_STATE_RUNNING");
 		} else {
 			startup_time -= dt;
 		}
@@ -1344,27 +1355,16 @@ static void run_lqr_control_speed(float dt)
 			    && (act_speed_mech_rpm < 0.5 * conf->s_lqr_min_speed)) {
 				lqr_run_state = LQR_RUN_STATE_STOPPING;
 				state_time = 0;
-				commands_printf("LQR_RUN_STATE_RUNNING -> LQR_RUN_STATE_STOPPING");
+				//commands_printf("LQR_RUN_STATE_RUNNING -> LQR_RUN_STATE_STOPPING (%f, %f)", set_speed_mech_rpm, act_speed_mech_rpm);
 			}
 		}
 		break;
 	case LQR_RUN_STATE_STOPPING:
 		duty_set = 0.0;
 		if (state_time > 1000) {
-			lqr_run_state = LQR_RUN_STATE_PRE_BRAKING;
-			state_time = 0;
-			commands_printf("LQR_RUN_STATE_STOPPING -> LQR_RUN_STATE_PRE_BRAKING");
-		} else {
-			state_time++;
-		}
-		break;
-	case LQR_RUN_STATE_PRE_BRAKING:
-		mcpwm_stop_pwm();
-		if (state_time > 1000)
-		{
-			/* Finally switch to off (and apply brake again) */
 			lqr_run_state = LQR_RUN_STATE_OFF;
-			commands_printf("LQR_RUN_STATE_PRE_BRAKING -> LQR_RUN_STATE_OFF");
+			state_time = 0;
+			//commands_printf("LQR_RUN_STATE_STOPPING -> LQR_RUN_STATE_OFF");
 		} else {
 			state_time++;
 		}
@@ -1372,7 +1372,7 @@ static void run_lqr_control_speed(float dt)
 	}
 
 	utils_truncate_number(&duty_set, 0.0,  conf->s_lqr_max_duty);
-	if (lqr_run_state != LQR_RUN_STATE_PRE_BRAKING) set_duty_cycle_hl(duty_set);
+	if (lqr_run_state != LQR_RUN_STATE_OFF) set_duty_cycle_hl(duty_set);
 }
 
 /* Limits the speed set value according thrust rate boundaries
